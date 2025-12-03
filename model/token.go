@@ -1,8 +1,10 @@
 package model
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -10,6 +12,8 @@ import (
 	"github.com/bytedance/gopkg/util/gopool"
 	"gorm.io/gorm"
 )
+
+const MaxGroupPriorities = 10
 
 type Token struct {
 	Id                 int            `json:"id"`
@@ -25,13 +29,95 @@ type Token struct {
 	ModelLimitsEnabled bool           `json:"model_limits_enabled"`
 	ModelLimits        string         `json:"model_limits" gorm:"type:varchar(1024);default:''"`
 	AllowIps           *string        `json:"allow_ips" gorm:"default:''"`
-	UsedQuota          int            `json:"used_quota" gorm:"default:0"` // used quota
-	Group              string         `json:"group" gorm:"default:''"`
+	UsedQuota          int            `json:"used_quota" gorm:"default:0"`                           // used quota
+	Group              string         `json:"group" gorm:"default:''"`                               // 单分组(向后兼容)
+	GroupPriorities    string         `json:"group_priorities" gorm:"type:varchar(2048);default:''"` // 多分组优先级(JSON)
+	AutoSmartGroup     bool           `json:"auto_smart_group" gorm:"default:false"`                 // 自动智能分组
 	DeletedAt          gorm.DeletedAt `gorm:"index"`
+}
+
+// GroupPriority 分组优先级结构
+type GroupPriority struct {
+	Group    string `json:"group"`
+	Priority int    `json:"priority"`
 }
 
 func (token *Token) Clean() {
 	token.Key = ""
+}
+
+// GetGroupPriorities 获取分组优先级列表
+func (token *Token) GetGroupPriorities() ([]GroupPriority, error) {
+	if token.GroupPriorities == "" {
+		// 向后兼容：如果没有配置多分组，使用 Group 字段
+		if token.Group != "" {
+			return []GroupPriority{{Group: token.Group, Priority: 1}}, nil
+		}
+		return []GroupPriority{}, nil
+	}
+
+	var priorities []GroupPriority
+	err := json.Unmarshal([]byte(token.GroupPriorities), &priorities)
+	if err != nil {
+		return nil, err
+	}
+
+	// 按优先级排序
+	sort.Slice(priorities, func(i, j int) bool {
+		return priorities[i].Priority < priorities[j].Priority
+	})
+
+	return priorities, nil
+}
+
+// SetGroupPriorities 设置分组优先级列表
+func (token *Token) SetGroupPriorities(priorities []GroupPriority) error {
+	if len(priorities) == 0 {
+		token.GroupPriorities = ""
+		return nil
+	}
+
+	if len(priorities) > MaxGroupPriorities {
+		return fmt.Errorf("最多只能配置 %d 个分组", MaxGroupPriorities)
+	}
+
+	cleaned := make([]GroupPriority, 0, len(priorities))
+	seen := make(map[string]struct{})
+
+	for _, p := range priorities {
+		groupName := strings.TrimSpace(p.Group)
+		if groupName == "" {
+			return errors.New("分组名称不能为空")
+		}
+		if p.Priority < 1 {
+			return errors.New("优先级必须大于0")
+		}
+		if _, ok := seen[groupName]; ok {
+			return errors.New("分组不能重复")
+		}
+		seen[groupName] = struct{}{}
+		cleaned = append(cleaned, GroupPriority{
+			Group:    groupName,
+			Priority: p.Priority,
+		})
+	}
+
+	sort.Slice(cleaned, func(i, j int) bool {
+		return cleaned[i].Priority < cleaned[j].Priority
+	})
+	for idx := range cleaned {
+		cleaned[idx].Priority = idx + 1
+	}
+
+	data, err := json.Marshal(cleaned)
+	if err != nil {
+		return err
+	}
+
+	token.GroupPriorities = string(data)
+	token.Group = cleaned[0].Group
+
+	return nil
 }
 
 func (token *Token) GetIpLimitsMap() map[string]any {
@@ -185,7 +271,7 @@ func (token *Token) Update() (err error) {
 		}
 	}()
 	err = DB.Model(token).Select("name", "status", "expired_time", "remain_quota", "unlimited_quota",
-		"model_limits_enabled", "model_limits", "allow_ips", "group").Updates(token).Error
+		"model_limits_enabled", "model_limits", "allow_ips", "group", "group_priorities", "auto_smart_group").Updates(token).Error
 	return err
 }
 

@@ -138,7 +138,7 @@ func testChannel(channel *model.Channel, testModel string, endpointType string) 
 		switch constant.EndpointType(endpointType) {
 		case constant.EndpointTypeOpenAI:
 			relayFormat = types.RelayFormatOpenAI
-		case constant.EndpointTypeOpenAIResponse:
+		case constant.EndpointTypeOpenAIResponse, constant.EndpointTypeOpenAIResponseRoot:
 			relayFormat = types.RelayFormatOpenAIResponses
 		case constant.EndpointTypeAnthropic:
 			relayFormat = types.RelayFormatClaude
@@ -171,7 +171,7 @@ func testChannel(channel *model.Channel, testModel string, endpointType string) 
 		if c.Request.URL.Path == "/v1/rerank" || c.Request.URL.Path == "/rerank" {
 			relayFormat = types.RelayFormatRerank
 		}
-		if c.Request.URL.Path == "/v1/responses" {
+		if c.Request.URL.Path == "/v1/responses" || c.Request.URL.Path == "/responses" {
 			relayFormat = types.RelayFormatOpenAIResponses
 		}
 	}
@@ -415,7 +415,7 @@ func buildTestRequest(model string, endpointType string) dto.Request {
 				Documents: []any{"Deep Learning is a subset of machine learning.", "Machine learning is a field of artificial intelligence."},
 				TopN:      2,
 			}
-		case constant.EndpointTypeOpenAIResponse:
+		case constant.EndpointTypeOpenAIResponse, constant.EndpointTypeOpenAIResponseRoot:
 			// 返回 OpenAIResponsesRequest
 			return &dto.OpenAIResponsesRequest{
 				Model: model,

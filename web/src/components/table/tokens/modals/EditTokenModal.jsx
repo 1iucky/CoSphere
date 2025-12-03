@@ -23,40 +23,42 @@ import {
   showError,
   showSuccess,
   timestamp2string,
-  renderGroupOption,
   renderQuotaWithPrompt,
   getModelCategories,
   selectFilter,
 } from '../../../../helpers';
 import { useIsMobile } from '../../../../hooks/common/useIsMobile';
 import {
-  Button,
-  SideSheet,
-  Space,
-  Spin,
-  Typography,
-  Card,
-  Tag,
-  Avatar,
-  Form,
-  Col,
-  Row,
+	Button,
+	SideSheet,
+	Space,
+	Spin,
+	Typography,
+	Card,
+	Tag,
+	Avatar,
+	Form,
+	Col,
+	Row,
 } from '@douyinfe/semi-ui';
 import {
-  IconCreditCard,
-  IconLink,
-  IconSave,
-  IconClose,
-  IconKey,
+	IconCreditCard,
+	IconLink,
+	IconSave,
+	IconClose,
+	IconKey,
 } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { StatusContext } from '../../../../context/Status';
+import { UserContext } from '../../../../context/User';
+import GroupPrioritiesSelector from '../../../common/GroupPrioritiesSelector';
 
 const { Text, Title } = Typography;
 
 const EditTokenModal = (props) => {
   const { t } = useTranslation();
   const [statusState, statusDispatch] = useContext(StatusContext);
+  const [userState] = useContext(UserContext);
   const [loading, setLoading] = useState(false);
   const isMobile = useIsMobile();
   const formApiRef = useRef(null);
@@ -73,6 +75,8 @@ const EditTokenModal = (props) => {
     model_limits: [],
     allow_ips: '',
     group: '',
+    group_priorities_array: [],
+    auto_smart_group: false,
     tokenCount: 1,
   });
 
@@ -125,6 +129,47 @@ const EditTokenModal = (props) => {
     }
   };
 
+  const applyDefaultGroup = (options) => {
+    if (!formApiRef.current || isEdit || options.length === 0) {
+      return;
+    }
+    const currentGroup = formApiRef.current.getValue('group');
+    const currentPriorities = formApiRef.current.getValue('group_priorities_array');
+    if (currentGroup || (Array.isArray(currentPriorities) && currentPriorities.length > 0)) {
+      return;
+    }
+    const userDefaultGroup = userState?.user?.group;
+    const matchedOption = options.find((option) => option.value === userDefaultGroup);
+    const fallbackOption = matchedOption || options[0];
+    if (fallbackOption) {
+      formApiRef.current.setValue('group', fallbackOption.value);
+    }
+  };
+
+  const parseGroupPriorities = (groupPriorities, fallbackGroup) => {
+    try {
+      if (groupPriorities && groupPriorities !== '') {
+        const parsed = JSON.parse(groupPriorities);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed
+            .filter((item) => item && item.group)
+            .sort((a, b) => (a.priority || 0) - (b.priority || 0))
+            .map((item, index) => ({
+              group: item.group,
+              priority: index + 1,
+            }));
+        }
+      }
+    } catch (error) {
+      console.error('Failed to parse group_priorities:', error);
+    }
+    const trimmedGroup = fallbackGroup?.trim();
+    if (trimmedGroup) {
+      return [{ group: trimmedGroup, priority: 1 }];
+    }
+    return [];
+  };
+
   const loadGroups = async () => {
     let res = await API.get(`/api/user/self/groups`);
     const { success, message, data } = res.data;
@@ -140,9 +185,7 @@ const EditTokenModal = (props) => {
         }
       }
       setGroups(localGroupOptions);
-      // if (statusState?.status?.default_use_auto_group && formApiRef.current) {
-      //   formApiRef.current.setValue('group', 'auto');
-      // }
+      applyDefaultGroup(localGroupOptions);
     } else {
       showError(t(message));
     }
@@ -161,8 +204,15 @@ const EditTokenModal = (props) => {
       } else {
         data.model_limits = [];
       }
+      // 解析 group_priorities JSON 字符串
+      const parsedPriorities = parseGroupPriorities(
+        data.group_priorities,
+        data.group,
+      );
+      data.group_priorities_array = parsedPriorities;
       if (formApiRef.current) {
         formApiRef.current.setValues({ ...getInitValues(), ...data });
+        formApiRef.current.setValue('group_priorities_array', parsedPriorities);
       }
     } else {
       showError(message);
@@ -220,6 +270,12 @@ const EditTokenModal = (props) => {
       }
       localInputs.model_limits = localInputs.model_limits.join(',');
       localInputs.model_limits_enabled = localInputs.model_limits.length > 0;
+      // 处理 group_priorities_array：过滤空分组并发送给后端
+      if (localInputs.group_priorities_array && localInputs.group_priorities_array.length > 0) {
+        localInputs.group_priorities_array = localInputs.group_priorities_array.filter(
+          item => item.group && item.group.trim() !== ''
+        );
+      }
       let res = await API.put(`/api/token/`, {
         ...localInputs,
         id: parseInt(props.editingToken.id),
@@ -257,6 +313,12 @@ const EditTokenModal = (props) => {
         }
         localInputs.model_limits = localInputs.model_limits.join(',');
         localInputs.model_limits_enabled = localInputs.model_limits.length > 0;
+        // 处理 group_priorities_array：过滤空分组并发送给后端
+        if (localInputs.group_priorities_array && localInputs.group_priorities_array.length > 0) {
+          localInputs.group_priorities_array = localInputs.group_priorities_array.filter(
+            item => item.group && item.group.trim() !== ''
+          );
+        }
         let res = await API.post(`/api/token/`, localInputs);
         const { success, message } = res.data;
         if (success) {
@@ -358,24 +420,33 @@ const EditTokenModal = (props) => {
                     />
                   </Col>
                   <Col span={24}>
-                    {groups.length > 0 ? (
-                      <Form.Select
-                        field='group'
-                        label={t('令牌分组')}
-                        placeholder={t('令牌分组，默认为用户的分组')}
-                        optionList={groups}
-                        renderOptionItem={renderGroupOption}
-                        showClear
-                        style={{ width: '100%' }}
+                    <Form.Slot
+                      label={
+                        <Space>
+                          <span>{t('令牌分组')}</span>
+                          <Text type='tertiary' size='small'>
+                            {t('（可多选、可拖拽排序）')}
+                          </Text>
+                        </Space>
+                      }
+                    >
+                      <GroupPrioritiesSelector
+                        value={values.group_priorities_array || []}
+                        onChange={(newValue) => {
+                          formApiRef.current?.setValue('group_priorities_array', newValue);
+                        }}
+                        availableGroups={groups}
+                        disabled={loading || groups.length === 0}
                       />
-                    ) : (
-                      <Form.Select
-                        placeholder={t('管理员未设置用户可选分组')}
-                        disabled
-                        label={t('令牌分组')}
-                        style={{ width: '100%' }}
-                      />
-                    )}
+                    </Form.Slot>
+                  </Col>
+                  <Col span={24}>
+                    <Form.Switch
+                      field='auto_smart_group'
+                      label={t('自动分组')}
+                      size='large'
+                      extraText={t('当调用模型不在选择的分组时，将自动定向分组')}
+                    />
                   </Col>
                   <Col xs={24} sm={24} md={24} lg={10} xl={10}>
                     <Form.DatePicker

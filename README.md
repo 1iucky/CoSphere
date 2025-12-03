@@ -1,6 +1,6 @@
 <div align="center">
 
-![new-api](/web/public/logo.png)
+![CoSphere](/web/public/logo.png)
 
 # New API
 
@@ -11,30 +11,6 @@
   <a href="./README.en.md">English</a> | 
   <a href="./README.fr.md">Français</a> | 
   <a href="./README.ja.md">日本語</a>
-</p>
-
-<p align="center">
-  <a href="https://raw.githubusercontent.com/Calcium-Ion/new-api/main/LICENSE">
-    <img src="https://img.shields.io/github/license/Calcium-Ion/new-api?color=brightgreen" alt="license">
-  </a>
-  <a href="https://github.com/Calcium-Ion/new-api/releases/latest">
-    <img src="https://img.shields.io/github/v/release/Calcium-Ion/new-api?color=brightgreen&include_prereleases" alt="release">
-  </a>
-  <a href="https://github.com/users/Calcium-Ion/packages/container/package/new-api">
-    <img src="https://img.shields.io/badge/docker-ghcr.io-blue" alt="docker">
-  </a>
-  <a href="https://hub.docker.com/r/CalciumIon/new-api">
-    <img src="https://img.shields.io/badge/docker-dockerHub-blue" alt="docker">
-  </a>
-  <a href="https://goreportcard.com/report/github.com/Calcium-Ion/new-api">
-    <img src="https://goreportcard.com/badge/github.com/Calcium-Ion/new-api" alt="GoReportCard">
-  </a>
-</p>
-
-<p align="center">
-  <a href="https://trendshift.io/repositories/8227" target="_blank">
-    <img src="https://trendshift.io/api/badge/repositories/8227" alt="Calcium-Ion%2Fnew-api | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/>
-  </a>
 </p>
 
 <p align="center">
@@ -83,30 +59,14 @@
   </a>
 </p>
 
----
-
-## 🙏 特别鸣谢
-
-<p align="center">
-  <a href="https://www.jetbrains.com/?from=new-api" target="_blank">
-    <img src="https://resources.jetbrains.com/storage/products/company/brand/logos/jb_beam.png" alt="JetBrains Logo" width="120" />
-  </a>
-</p>
-
-<p align="center">
-  <strong>感谢 <a href="https://www.jetbrains.com/?from=new-api">JetBrains</a> 为本项目提供免费的开源开发许可证</strong>
-</p>
-
----
-
 ## 🚀 快速开始
 
 ### 使用 Docker Compose（推荐）
 
 ```bash
 # 克隆项目
-git clone https://github.com/QuantumNous/new-api.git
-cd new-api
+git clone https://github.com/1iucky/CoSphere
+cd CoSphere
 
 # 编辑 docker-compose.yml 配置
 nano docker-compose.yml
@@ -120,22 +80,22 @@ docker-compose up -d
 
 ```bash
 # 拉取最新镜像
-docker pull calciumion/new-api:latest
+docker pull calciumion/CoSphere:latest
 
 # 使用 SQLite（默认）
-docker run --name new-api -d --restart always \
+docker run --name CoSphere -d --restart always \
   -p 3000:3000 \
   -e TZ=Asia/Shanghai \
   -v ./data:/data \
-  calciumion/new-api:latest
+  calciumion/CoSphere:latest
 
 # 使用 MySQL
-docker run --name new-api -d --restart always \
+docker run --name CoSphere -d --restart always \
   -p 3000:3000 \
   -e SQL_DSN="root:123456@tcp(localhost:3306)/oneapi" \
   -e TZ=Asia/Shanghai \
   -v ./data:/data \
-  calciumion/new-api:latest
+  calciumion/CoSphere:latest
 ```
 
 > **💡 提示：** `-v ./data:/data` 会将数据保存在当前目录的 `data` 文件夹中，你也可以改为绝对路径如 `-v /your/custom/path:/data`
@@ -154,7 +114,7 @@ docker run --name new-api -d --restart always \
 
 <div align="center">
 
-### 📖 [官方文档](https://docs.newapi.pro/) | [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/QuantumNous/new-api)
+### 📖 [官方文档](https://docs.newapi.pro/) | [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/QuantumNous/CoSphere)
 
 </div>
 
@@ -282,7 +242,7 @@ docker run --name new-api -d --restart always \
 ## 🚢 部署
 
 > [!TIP]
-> **最新版 Docker 镜像：** `calciumion/new-api:latest`
+> **最新版 Docker 镜像：** `calciumion/CoSphere:latest`
 
 ### 📋 部署要求
 
@@ -318,8 +278,8 @@ docker run --name new-api -d --restart always \
 
 ```bash
 # 克隆项目
-git clone https://github.com/QuantumNous/new-api.git
-cd new-api
+git clone https://github.com/1iucky/CoSphere
+cd CoSphere
 
 # 编辑配置
 nano docker-compose.yml
@@ -335,21 +295,21 @@ docker-compose up -d
 
 **使用 SQLite：**
 ```bash
-docker run --name new-api -d --restart always \
+docker run --name CoSphere -d --restart always \
   -p 3000:3000 \
   -e TZ=Asia/Shanghai \
   -v ./data:/data \
-  calciumion/new-api:latest
+  calciumion/CoSphere:latest
 ```
 
 **使用 MySQL：**
 ```bash
-docker run --name new-api -d --restart always \
+docker run --name CoSphere -d --restart always \
   -p 3000:3000 \
   -e SQL_DSN="root:123456@tcp(localhost:3306)/oneapi" \
   -e TZ=Asia/Shanghai \
   -v ./data:/data \
-  calciumion/new-api:latest
+  calciumion/CoSphere:latest
 ```
 
 > **💡 路径说明：** 
@@ -362,7 +322,7 @@ docker run --name new-api -d --restart always \
 <summary><strong>方式 3：宝塔面板</strong></summary>
 
 1. 安装宝塔面板（≥ 9.2.0 版本）
-2. 在应用商店搜索 **New-API**
+2. 在应用商店搜索 **CoSphere**
 3. 一键安装
 
 📖 [图文教程](./docs/BT.md)
@@ -399,7 +359,7 @@ docker run --name new-api -d --restart always \
 | 项目 | 说明 |
 |------|------|
 | [neko-api-key-tool](https://github.com/Calcium-Ion/neko-api-key-tool) | Key 额度查询工具 |
-| [new-api-horizon](https://github.com/Calcium-Ion/new-api-horizon) | New API 高性能优化版 |
+| [CoSphere-horizon](https://github.com/Calcium-Ion/CoSphere-horizon) | New API 高性能优化版 |
 
 ---
 
@@ -429,7 +389,7 @@ docker run --name new-api -d --restart always \
 
 <div align="center">
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Calcium-Ion/new-api&type=Date)](https://star-history.com/#Calcium-Ion/new-api&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=Calcium-Ion/CoSphere&type=Date)](https://star-history.com/#Calcium-Ion/CoSphere&Date)
 
 </div>
 
@@ -441,7 +401,7 @@ docker run --name new-api -d --restart always \
 
 如果这个项目对你有帮助，欢迎给我们一个 ⭐️ Star！
 
-**[官方文档](https://docs.newapi.pro/)** • **[问题反馈](https://github.com/Calcium-Ion/new-api/issues)** • **[最新发布](https://github.com/Calcium-Ion/new-api/releases)**
+**[官方文档](https://docs.newapi.pro/)** • **[问题反馈](https://github.com/Calcium-Ion/CoSphere/issues)** • **[最新发布](https://github.com/Calcium-Ion/CoSphere/releases)**
 
 <sub>Built with ❤️ by QuantumNous</sub>
 

@@ -53,6 +53,8 @@ services:
     image: redis:latest
     container_name: redis
     restart: always
+    ports:
+      - "6379:6379"
 
   postgres:
     image: postgres:15
@@ -64,8 +66,8 @@ services:
       POSTGRES_DB: new-api
     volumes:
       - pg_data:/var/lib/postgresql/data
-#    ports:
-#      - "5432:5432"  # Uncomment if you need to access PostgreSQL from outside Docker
+    ports:
+      - "5432:5432"  # Uncomment if you need to access PostgreSQL from outside Docker
 
 #  mysql:
 #    image: mysql:8.2
@@ -81,4 +83,5 @@ services:
 
 volumes:
   pg_data:
+    driver: local
 #  mysql_data:

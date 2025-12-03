@@ -1,0 +1,12 @@
+{
+  "id": "approval_1764509561953_sw99bh8uj",
+  "title": "任务拆解文档 (tasks.md) 审批",
+  "filePath": ".spec-workflow/specs/token-multi-group-priority/tasks.md",
+  "type": "document",
+  "status": "rejected",
+  "createdAt": "2025-11-30T13:32:41.953Z",
+  "category": "spec",
+  "categoryName": "token-multi-group-priority",
+  "response": "设计缺陷",
+  "respondedAt": "2025-11-30T13:59:56.116Z"
+}

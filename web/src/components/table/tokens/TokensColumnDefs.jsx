@@ -87,8 +87,42 @@ const renderStatus = (text, record, t) => {
   );
 };
 
-// Render group column
-const renderGroupColumn = (text, t) => {
+const getPriorityDisplayText = (record) => {
+  if (record.group_priorities && record.group_priorities !== '') {
+    try {
+      const parsed = JSON.parse(record.group_priorities);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const sorted = parsed
+          .filter(item => item && item.group)
+          .sort((a, b) => (a.priority || 0) - (b.priority || 0));
+        if (sorted.length > 0) {
+          return sorted.map(item => item.group).join(' > ');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to parse group_priorities:', error);
+    }
+  }
+  return '';
+};
+
+// Render group column with priorities
+const renderGroupColumn = (text, record, t) => {
+  const displayText = getPriorityDisplayText(record);
+
+  if (displayText) {
+    return (
+      <div>
+        <div className='text-sm font-medium'>{displayText}</div>
+        {record.auto_smart_group && (
+          <Tag size='small' color='green' className='mt-1'>
+            {t('智能分组')}
+          </Tag>
+        )}
+      </div>
+    );
+  }
+
   if (text === 'auto') {
     return (
       <Tooltip
@@ -98,13 +132,23 @@ const renderGroupColumn = (text, t) => {
         position='top'
       >
         <Tag color='white' shape='circle'>
-          {' '}
-          {t('智能熔断')}{' '}
+          {t('智能熔断')}
         </Tag>
       </Tooltip>
     );
   }
-  return renderGroup(text);
+
+  const fallback = renderGroup(text);
+  return (
+    <div>
+      {fallback}
+      {record.auto_smart_group && (
+        <Tag size='small' color='green' className='mt-1'>
+          {t('智能分组')}
+        </Tag>
+      )}
+    </div>
+  );
 };
 
 // Render token key column with show/hide and copy functionality
@@ -455,7 +499,7 @@ export const getTokensColumns = ({
       title: t('分组'),
       dataIndex: 'group',
       key: 'group',
-      render: (text) => renderGroupColumn(text, t),
+      render: (text, record) => renderGroupColumn(text, record, t),
     },
     {
       title: t('密钥'),

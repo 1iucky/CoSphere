@@ -1,0 +1,30 @@
+{
+  "filePath": ".spec-workflow/specs/token-multi-group-priority/requirements.md",
+  "currentVersion": 3,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-11-30T12:31:43.099Z",
+      "trigger": "initial",
+      "approvalId": "approval_1764505903091_kv2lvi0f2",
+      "approvalTitle": "需求规格文档 - 令牌多分组优先级管理"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2025-11-30T13:02:37.608Z",
+      "trigger": "revision_requested",
+      "approvalId": "approval_1764505903091_kv2lvi0f2",
+      "approvalTitle": "需求规格文档 - 令牌多分组优先级管理"
+    },
+    {
+      "version": 3,
+      "filename": "snapshot-003.json",
+      "timestamp": "2025-11-30T13:08:50.725Z",
+      "trigger": "approved",
+      "approvalId": "approval_1764507927651_agklindap",
+      "approvalTitle": "需求规格文档 - 令牌多分组优先级管理 (修订版)"
+    }
+  ]
+}

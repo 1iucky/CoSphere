@@ -63,7 +63,10 @@ const (
 	ErrorCodeAccessDenied          ErrorCode = "access_denied"
 
 	// request error
-	ErrorCodeBadRequestBody ErrorCode = "bad_request_body"
+	ErrorCodeBadRequestBody     ErrorCode = "bad_request_body"
+	ErrorCodeGroupConfigInvalid ErrorCode = "group_config_invalid"
+	ErrorCodeNoAvailableGroup   ErrorCode = "no_available_group"
+	ErrorCodeAllGroupsFailed    ErrorCode = "all_groups_failed"
 
 	// response error
 	ErrorCodeReadResponseBodyFailed ErrorCode = "read_response_body_failed"

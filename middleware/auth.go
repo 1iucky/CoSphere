@@ -308,6 +308,7 @@ func SetupContextForToken(c *gin.Context, token *model.Token, parts ...string) e
 		c.Set("token_model_limit_enabled", false)
 	}
 	c.Set("token_group", token.Group)
+	c.Set("token", token) // 缓存 token 实例，供 distributor 使用
 	if len(parts) > 1 {
 		if model.IsAdmin(token.UserId) {
 			c.Set("specific_channel_id", parts[1])

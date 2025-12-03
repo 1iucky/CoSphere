@@ -97,24 +97,46 @@ func Distribute() func(c *gin.Context) {
 						common.SetContextKey(c, constant.ContextKeyUsingGroup, usingGroup)
 					}
 				}
-				channel, selectGroup, err = service.CacheGetRandomSatisfiedChannel(c, usingGroup, modelRequest.Model, 0)
+				// 获取 token 实例，优先使用优先级选择
+				tokenInterface, exists := c.Get("token")
+				if exists && tokenInterface != nil {
+					token, ok := tokenInterface.(*model.Token)
+					if ok {
+						// 使用多分组优先级选择
+						channel, selectGroup, err = service.SelectChannelWithPriority(c, token, modelRequest.Model, 0)
+					} else {
+						// 回退到原有逻辑
+						channel, selectGroup, err = service.CacheGetRandomSatisfiedChannel(c, usingGroup, modelRequest.Model, 0)
+					}
+				} else {
+					// 回退到原有逻辑（兼容没有 token 的场景）
+					channel, selectGroup, err = service.CacheGetRandomSatisfiedChannel(c, usingGroup, modelRequest.Model, 0)
+				}
 				if err != nil {
 					showGroup := usingGroup
 					if usingGroup == "auto" {
 						showGroup = fmt.Sprintf("auto(%s)", selectGroup)
 					}
 					message := fmt.Sprintf("获取分组 %s 下模型 %s 的可用渠道失败（distributor）: %s", showGroup, modelRequest.Model, err.Error())
-					// 如果错误，但是渠道不为空，说明是数据库一致性问题
-					//if channel != nil {
-					//	common.SysError(fmt.Sprintf("渠道不存在：%d", channel.Id))
-					//	message = "数据库一致性已被破坏，请联系管理员"
-					//}
-					abortWithOpenAiMessage(c, http.StatusServiceUnavailable, message, string(types.ErrorCodeModelNotFound))
+					code := types.ErrorCodeModelNotFound
+					switch {
+					case errors.Is(err, service.ErrAllGroupsFailed):
+						code = types.ErrorCodeAllGroupsFailed
+					case errors.Is(err, service.ErrNoAvailableGroup):
+						code = types.ErrorCodeNoAvailableGroup
+					}
+					abortWithOpenAiMessage(c, http.StatusServiceUnavailable, message, string(code))
 					return
 				}
 				if channel == nil {
 					abortWithOpenAiMessage(c, http.StatusServiceUnavailable, fmt.Sprintf("分组 %s 下模型 %s 无可用渠道（distributor）", usingGroup, modelRequest.Model), string(types.ErrorCodeModelNotFound))
 					return
+				}
+				if selectGroup != "" {
+					if common.GetContextKeyString(c, constant.ContextKeySelectedGroup) == "" {
+						common.SetContextKey(c, constant.ContextKeySelectedGroup, selectGroup)
+					}
+					common.SetContextKey(c, constant.ContextKeyUsingGroup, selectGroup)
 				}
 			}
 		}

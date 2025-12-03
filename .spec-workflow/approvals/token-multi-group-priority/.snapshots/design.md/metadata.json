@@ -1,0 +1,30 @@
+{
+  "filePath": ".spec-workflow/specs/token-multi-group-priority/design.md",
+  "currentVersion": 3,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-11-30T13:15:55.483Z",
+      "trigger": "initial",
+      "approvalId": "approval_1764508555479_q3gpcdu86",
+      "approvalTitle": "设计规格文档 - 令牌多分组优先级管理"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2025-11-30T13:21:46.296Z",
+      "trigger": "approved",
+      "approvalId": "approval_1764508555479_q3gpcdu86",
+      "approvalTitle": "设计规格文档 - 令牌多分组优先级管理"
+    },
+    {
+      "version": 3,
+      "filename": "snapshot-003.json",
+      "timestamp": "2025-12-01T01:47:22.217Z",
+      "trigger": "approved",
+      "approvalId": "approval_1764511606504_mqpeddg4c",
+      "approvalTitle": "设计规格文档 v1.1 (design.md) 审批 - 已根据反馈修订"
+    }
+  ]
+}
