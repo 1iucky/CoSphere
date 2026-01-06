@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
@@ -78,6 +79,24 @@ func UpdateOption(c *gin.Context) {
 				"message": "无法启用 Discord OAuth，请先填入 Discord Client Id 以及 Discord Client Secret！",
 			})
 			return
+		}
+	case "google.enabled":
+		if option.Value == "true" {
+			googleSetting := system_setting.GetGoogleSettings()
+			if googleSetting.ClientId == "" || googleSetting.ClientSecret == "" {
+				c.JSON(http.StatusOK, gin.H{
+					"success": false,
+					"message": "无法启用 Google OAuth，请先填入 Google Client Id 以及 Google Client Secret！",
+				})
+				return
+			}
+			if system_setting.ServerAddress == "" {
+				c.JSON(http.StatusOK, gin.H{
+					"success": false,
+					"message": "无法启用 Google OAuth，请先在系统设置中配置网站地址（ServerAddress）！",
+				})
+				return
+			}
 		}
 	case "oidc.enabled":
 		if option.Value == "true" && system_setting.GetOIDCSettings().ClientId == "" {
@@ -206,6 +225,52 @@ func UpdateOption(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
 				"message": err.Error(),
+			})
+			return
+		}
+	// 订阅系统配置项验证
+	case common.OptionKeySubscriptionAutoWalletDefault:
+		_, err := strconv.ParseBool(option.Value.(string))
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "自动兜底配置必须是布尔值（true 或 false）",
+			})
+			return
+		}
+	case common.OptionKeySubscriptionV2Enabled:
+		_, err := strconv.ParseBool(option.Value.(string))
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "订阅系统启用开关必须是布尔值（true 或 false）",
+			})
+			return
+		}
+	case common.OptionKeySubscriptionExpiryNoticeDays:
+		days, err := strconv.Atoi(option.Value.(string))
+		if err != nil || days < 1 || days > 90 {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "到期提醒天数必须在 1-90 之间",
+			})
+			return
+		}
+	case common.OptionKeySubscriptionMaxPerUser:
+		maxSubs, err := strconv.Atoi(option.Value.(string))
+		if err != nil || maxSubs < 1 || maxSubs > 100 {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "每用户最大订阅数必须在 1-100 之间",
+			})
+			return
+		}
+	case common.OptionKeySubscriptionQuotaLowThreshold:
+		threshold, err := strconv.ParseFloat(option.Value.(string), 64)
+		if err != nil || threshold < 0.0 || threshold > 1.0 {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "额度低阈值必须在 0.0-1.0 之间",
 			})
 			return
 		}

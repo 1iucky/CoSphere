@@ -43,6 +43,7 @@ func TestTokenRequest_JSONParsing(t *testing.T) {
 					{"group": "vip", "priority": 1},
 					{"group": "standard", "priority": 2}
 				],
+				"subscription_preferred": true,
 				"auto_smart_group": true
 			}`,
 			expectError: false,
@@ -96,6 +97,9 @@ func TestTokenRequest_JSONParsing(t *testing.T) {
 				if tt.name == "正常的分组优先级数组" {
 					if len(tokenReq.GroupPrioritiesArray) != 2 {
 						t.Errorf("期望 2 个优先级, 得到 %d", len(tokenReq.GroupPrioritiesArray))
+					}
+					if tokenReq.SubscriptionPreferred != true {
+						t.Errorf("期望 SubscriptionPreferred 为 true, 得到 %v", tokenReq.SubscriptionPreferred)
 					}
 					if tokenReq.AutoSmartGroup != true {
 						t.Errorf("期望 AutoSmartGroup 为 true, 得到 %v", tokenReq.AutoSmartGroup)

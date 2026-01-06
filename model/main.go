@@ -271,7 +271,69 @@ func migrateDB() error {
 	if err != nil {
 		return err
 	}
+
+	// 数据库迁移后，执行数据初始化
+	err = initializeDataIfNeeded()
+	if err != nil {
+		common.SysLog("warning: data initialization failed: " + err.Error())
+		// 不返回错误，避免阻塞迁移流程
+	}
+
 	return nil
+}
+
+// initializeDataIfNeeded 在数据库迁移后执行必要的数据初始化
+// 包括为存量用户设置订阅相关的默认值等
+func initializeDataIfNeeded() error {
+	// 检查是否已经初始化过（通过检查是否有用户已设置 AutoWalletFallback 显式标记）
+	// 如果所有用户都未设置，说明是首次迁移或存量系统，需要初始化
+
+	var count int64
+	err := DB.Model(&User{}).Count(&count).Error
+	if err != nil {
+		return err
+	}
+
+	// 如果没有用户，跳过初始化
+	if count == 0 {
+		return nil
+	}
+
+	// 为所有存量用户初始化 AutoWalletFallback 默认值
+	// 由于此时 OptionMap 尚未初始化，直接从 options 表读取配置值
+	systemDefault := getAutoWalletFallbackDefaultFromDB()
+	initializedCount, err := InitializeAutoWalletFallbackForAllUsers(systemDefault)
+	if err != nil {
+		return err
+	}
+
+	if initializedCount > 0 {
+		common.SysLog(fmt.Sprintf("initialized AutoWalletFallback for %d existing users with system default: %v", initializedCount, systemDefault))
+	}
+
+	return nil
+}
+
+// getAutoWalletFallbackDefaultFromDB 直接从 options 表读取 SUBSCRIPTION_AUTO_WALLET_DEFAULT 配置
+// 此方法在 OptionMap 初始化前调用，用于数据库迁移阶段的配置读取
+func getAutoWalletFallbackDefaultFromDB() bool {
+	var option Option
+	err := DB.Where("`key` = ?", common.OptionKeySubscriptionAutoWalletDefault).First(&option).Error
+
+	if err != nil {
+		// 如果查询失败或未配置，使用代码默认值
+		return common.DefaultSubscriptionAutoWalletFallback
+	}
+
+	// 解析配置值
+	if option.Value == "true" || option.Value == "1" {
+		return true
+	} else if option.Value == "false" || option.Value == "0" {
+		return false
+	}
+
+	// 如果解析失败，使用代码默认值
+	return common.DefaultSubscriptionAutoWalletFallback
 }
 
 func migrateDBFast() error {

@@ -74,13 +74,20 @@ type ChannelMeta struct {
 }
 
 type RelayInfo struct {
-	TokenId           int
-	TokenKey          string
-	UserId            int
-	UsingGroup        string // 使用的分组
-	UserGroup         string // 用户所在分组
-	TokenUnlimited    bool
-	StartTime         time.Time
+	TokenId                   int
+	TokenKey                  string
+	UserId                    int
+	UsingGroup                string // 使用的分组
+	UserGroup                 string // 用户所在分组
+	TokenUnlimited            bool
+	TokenSubscriptionPreferred bool   // 令牌是否优先使用订阅扣费
+	BillingSource             string // 计费来源（subscription/wallet/fallback/skipped）
+	BillingSkipReason         string // 跳过订阅扣费原因
+	SubscriptionId            int64  // 订阅 ID
+	SubscriptionContextId     string // 订阅预扣上下文 ID
+	SubscriptionChannelGroup  string // 订阅绑定分组（用于渠道选择）
+	SubscriptionPreConsumedQuota int64 // 订阅预扣额度
+	StartTime                 time.Time
 	FirstResponseTime time.Time
 	isFirstResponse   bool
 	//SendLastReasoningResponse bool
@@ -393,9 +400,10 @@ func genBaseRelayInfo(c *gin.Context, request dto.Request) *RelayInfo {
 		OriginModelName: common.GetContextKeyString(c, constant.ContextKeyOriginalModel),
 		PromptTokens:    common.GetContextKeyInt(c, constant.ContextKeyPromptTokens),
 
-		TokenId:        common.GetContextKeyInt(c, constant.ContextKeyTokenId),
-		TokenKey:       common.GetContextKeyString(c, constant.ContextKeyTokenKey),
-		TokenUnlimited: common.GetContextKeyBool(c, constant.ContextKeyTokenUnlimited),
+		TokenId:                    common.GetContextKeyInt(c, constant.ContextKeyTokenId),
+		TokenKey:                   common.GetContextKeyString(c, constant.ContextKeyTokenKey),
+		TokenUnlimited:             common.GetContextKeyBool(c, constant.ContextKeyTokenUnlimited),
+		TokenSubscriptionPreferred: common.GetContextKeyBool(c, constant.ContextKeyTokenSubscriptionPreferred),
 
 		isFirstResponse: true,
 		RelayMode:       relayconstant.Path2RelayMode(c.Request.URL.Path),

@@ -1,10 +1,13 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
@@ -15,6 +18,29 @@ import (
 )
 
 func ReturnPreConsumedQuota(c *gin.Context, relayInfo *relaycommon.RelayInfo) {
+	if relayInfo == nil {
+		return
+	}
+
+	if relayInfo.BillingSource == BillingSourceSubscription && relayInfo.SubscriptionContextId != "" {
+		contextId := relayInfo.SubscriptionContextId
+		gopool.Go(func() {
+			if err := GetSubscriptionUsageService().RollbackPreConsume(contextId); err != nil {
+				common.SysLog("error rollback subscription pre-consume: " + err.Error())
+			}
+		})
+		// subscription 计费不预扣用户余额，仅回滚 token 预扣
+		if relayInfo.FinalPreConsumedQuota != 0 && !relayInfo.IsPlayground {
+			tokenRefund := relayInfo.FinalPreConsumedQuota
+			gopool.Go(func() {
+				if err := model.IncreaseTokenQuota(relayInfo.TokenId, relayInfo.TokenKey, tokenRefund); err != nil {
+					common.SysLog("error return pre-consumed token quota: " + err.Error())
+				}
+			})
+		}
+		return
+	}
+
 	if relayInfo.FinalPreConsumedQuota != 0 {
 		logger.LogInfo(c, fmt.Sprintf("用户 %d 请求失败, 返还预扣费额度 %s", relayInfo.UserId, logger.FormatQuota(relayInfo.FinalPreConsumedQuota)))
 		gopool.Go(func() {
@@ -31,6 +57,68 @@ func ReturnPreConsumedQuota(c *gin.Context, relayInfo *relaycommon.RelayInfo) {
 // PreConsumeQuota checks if the user has enough quota to pre-consume.
 // It returns the pre-consumed quota if successful, or an error if not.
 func PreConsumeQuota(c *gin.Context, preConsumedQuota int, relayInfo *relaycommon.RelayInfo) *types.NewAPIError {
+	if relayInfo == nil {
+		return types.NewError(errors.New("relayInfo 不能为空"), types.ErrorCodeInvalidRequestParams, types.ErrOptionWithSkipRetry())
+	}
+
+	useWallet := true
+	var billingCtx *BillingContext
+
+	if common.IsSubscriptionEnabled() {
+		billingSvc := GetSubscriptionBillingService()
+		ctx, err := billingSvc.SelectCandidate(int64(relayInfo.UserId), relayInfo.OriginModelName, "", relayInfo)
+		if err != nil {
+			return types.NewError(err, types.ErrorCodeSubscriptionOperationFailed, types.ErrOptionWithSkipRetry())
+		}
+
+		if ctx != nil {
+			switch ctx.Source {
+			case BillingSourceSkipped:
+				relayInfo.BillingSkipReason = ctx.SkipReason
+				relayInfo.BillingSource = BillingSourceWallet
+			case BillingSourceWallet:
+				relayInfo.BillingSource = BillingSourceWallet
+			default:
+				result, err := billingSvc.TryBilling(ctx, int64(preConsumedQuota), relayInfo)
+				if err != nil {
+					if apiErr, ok := err.(*types.NewAPIError); ok {
+						return apiErr
+					}
+					return types.NewError(err, types.ErrorCodeSubscriptionOperationFailed, types.ErrOptionWithSkipRetry())
+				}
+				relayInfo.BillingSource = result.Source
+				if result.Source == BillingSourceSubscription && result.Context != nil {
+					useWallet = false
+					billingCtx = result.Context
+					relayInfo.SubscriptionId = result.SubscriptionId
+					if result.Context.PreConsumeContext != nil {
+						relayInfo.SubscriptionContextId = result.Context.PreConsumeContext.ContextId
+					}
+					relayInfo.SubscriptionPreConsumedQuota = int64(preConsumedQuota)
+					relayInfo.SubscriptionChannelGroup = result.Context.ChannelGroup
+					if group := firstGroup(result.Context.ChannelGroup); group != "" {
+						common.SetContextKey(c, constant.ContextKeyUsingGroup, group)
+						relayInfo.UsingGroup = group
+					}
+				}
+			}
+		}
+	}
+
+	if !useWallet {
+		// subscription 路径：不扣用户余额，但仍需校验/预扣 token 额度
+		if preConsumedQuota > 0 && !relayInfo.IsPlayground {
+			if err := PreConsumeTokenQuota(relayInfo, preConsumedQuota); err != nil {
+				if billingCtx != nil && billingCtx.PreConsumeContext != nil {
+					_ = GetSubscriptionUsageService().RollbackPreConsume(billingCtx.PreConsumeContext.ContextId)
+				}
+				return types.NewErrorWithStatusCode(err, types.ErrorCodePreConsumeTokenQuotaFailed, http.StatusForbidden, types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
+			}
+		}
+		relayInfo.FinalPreConsumedQuota = preConsumedQuota
+		return nil
+	}
+
 	userQuota, err := model.GetUserQuota(relayInfo.UserId, false)
 	if err != nil {
 		return types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
@@ -75,5 +163,22 @@ func PreConsumeQuota(c *gin.Context, preConsumedQuota int, relayInfo *relaycommo
 		logger.LogInfo(c, fmt.Sprintf("用户 %d 预扣费 %s, 预扣费后剩余额度: %s", relayInfo.UserId, logger.FormatQuota(preConsumedQuota), logger.FormatQuota(userQuota-preConsumedQuota)))
 	}
 	relayInfo.FinalPreConsumedQuota = preConsumedQuota
+	if relayInfo.BillingSource == "" {
+		relayInfo.BillingSource = BillingSourceWallet
+	}
 	return nil
+}
+
+func firstGroup(groupStr string) string {
+	if groupStr == "" {
+		return ""
+	}
+	parts := strings.Split(groupStr, ",")
+	for _, part := range parts {
+		group := strings.TrimSpace(part)
+		if group != "" {
+			return group
+		}
+	}
+	return ""
 }

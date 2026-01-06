@@ -67,6 +67,8 @@ export interface Token {
   group_priorities: string;
   /** 是否启用自动智能分组 */
   auto_smart_group: boolean;
+  /** 是否优先使用订阅扣费 */
+  subscription_preferred: boolean;
 }
 
 /**
@@ -81,7 +83,8 @@ export interface Token {
  * const token = {
  *   group: 'default',
  *   group_priorities: '[{"group":"vip","priority":1},{"group":"standard","priority":2}]',
- *   auto_smart_group: false
+ *   auto_smart_group: false,
+ *   subscription_preferred: false
  * };
  *
  * const priorities = parseGroupPriorities(token);
@@ -152,7 +155,8 @@ function fallbackToGroupField(group?: string): GroupPriority[] {
  * const token = {
  *   group: 'default',
  *   group_priorities: '[{"group":"vip","priority":1},{"group":"standard","priority":2}]',
- *   auto_smart_group: true
+ *   auto_smart_group: true,
+ *   subscription_preferred: true
  * };
  *
  * // 默认格式（箭头分隔）

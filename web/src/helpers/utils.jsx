@@ -32,6 +32,19 @@ const HTMLToastContent = ({ htmlContent }) => {
   return <div dangerouslySetInnerHTML={{ __html: htmlContent }} />;
 };
 export default HTMLToastContent;
+
+/**
+ * 获取静态资源的完整路径（自动添加 base 前缀）
+ * @param {string} path - 资源路径，如 'logo.png' 或 '/logo.png'
+ * @returns {string} 带 base 前缀的完整路径
+ */
+export function getAssetUrl(path) {
+  const basePath = import.meta.env.BASE_URL || '/';
+  // 移除路径开头的斜杠，避免重复
+  const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+  return `${basePath}${cleanPath}`;
+}
+
 export function isAdmin() {
   let user = localStorage.getItem('user');
   if (!user) return false;
@@ -54,8 +67,21 @@ export function getSystemName() {
 
 export function getLogo() {
   let logo = localStorage.getItem('logo');
-  if (!logo) return '/logo.png';
-  return logo;
+  if (logo) return logo;
+  let themeMode = localStorage.getItem('theme-mode') || 'auto';
+  let actualTheme = themeMode;
+  if (themeMode === 'auto') {
+    if (window.matchMedia) {
+      actualTheme = window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'dark'
+        : 'light';
+    } else {
+      actualTheme = 'light';
+    }
+  }
+  const basePath = import.meta.env.BASE_URL || '/';
+  const logoFile = actualTheme === 'dark' ? 'logo-white.png' : 'logo.png';
+  return `${basePath}${logoFile}`;
 }
 
 export function getUserIdFromLocalStorage() {

@@ -1,0 +1,2697 @@
+openapi: 3.0.3
+info:
+  title: New API - Subscription System API
+  description: |
+    订阅系统 API 文档，包含套餐管理、订阅管理、优惠券管理、兑换码等功能。
+
+    ## 认证方式
+    - Admin API: 需要 `Authorization: Bearer {admin_token}` 请求头
+    - User API: 需要 `Authorization: Bearer {user_token}` 请求头
+
+    ## 通用响应格式
+    ```json
+    {
+      "success": true,
+      "message": "操作成功",
+      "data": {...}
+    }
+    ```
+
+    ## 错误响应格式
+    ```json
+    {
+      "success": false,
+      "message": "错误描述"
+    }
+    ```
+  version: 1.0.0
+  contact:
+    name: API Support
+servers:
+  - url: /api
+    description: API Server
+
+tags:
+  - name: Admin - Subscription Plans
+    description: 管理员套餐管理 API
+  - name: Admin - Subscriptions
+    description: 管理员订阅管理 API
+  - name: Admin - Subscription Orders
+    description: 管理员订单管理 API
+  - name: Admin - Subscription Coupons
+    description: 管理员优惠券管理 API
+  - name: User - Subscriptions
+    description: 用户订阅 API
+  - name: User - Coupons
+    description: 用户优惠券 API
+  - name: User - Redemptions
+    description: 用户兑换 API
+  - name: User - Settings
+    description: 用户设置 API
+  - name: Public
+    description: 公开 API
+
+paths:
+  # ==================== Admin - Subscription Plans ====================
+  /admin/subscription-plans:
+    get:
+      tags:
+        - Admin - Subscription Plans
+      summary: 获取所有套餐列表
+      description: 分页获取套餐列表，支持状态和计费周期筛选
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, active, archived]
+          description: 套餐状态筛选
+        - name: billing_cycle
+          in: query
+          schema:
+            type: string
+            enum: [monthly, yearly, custom]
+          description: 计费周期筛选
+        - name: min_price
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+          description: 最低价格筛选（分）
+        - name: max_price
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+          description: 最高价格筛选（分）
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SubscriptionPlanResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Admin - Subscription Plans
+      summary: 创建套餐
+      description: 创建新的订阅套餐
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscriptionPlanRequest'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SubscriptionPlanResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /admin/subscription-plans/{id}:
+    get:
+      tags:
+        - Admin - Subscription Plans
+      summary: 获取套餐详情
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SubscriptionPlanResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Admin - Subscription Plans
+      summary: 更新套餐
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscriptionPlanRequest'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags:
+        - Admin - Subscription Plans
+      summary: 删除套餐
+      description: 只能删除草稿状态的套餐
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/subscription-plans/{id}/publish:
+    post:
+      tags:
+        - Admin - Subscription Plans
+      summary: 发布套餐
+      description: 将草稿状态的套餐发布为激活状态
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 发布成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /admin/subscription-plans/{id}/unpublish:
+    post:
+      tags:
+        - Admin - Subscription Plans
+      summary: 下架套餐
+      description: 将激活状态的套餐下架为归档状态
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 下架成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  # ==================== Admin - Subscriptions ====================
+  /admin/subscriptions:
+    get:
+      tags:
+        - Admin - Subscriptions
+      summary: 获取所有订阅列表
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+          description: 用户 ID 筛选
+        - name: plan_id
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+          description: 套餐 ID 筛选
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, active, expired, cancelled]
+          description: 订阅状态筛选
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SubscriptionResponse'
+
+  /admin/subscriptions/{id}:
+    get:
+      tags:
+        - Admin - Subscriptions
+      summary: 获取订阅详情
+      description: 获取订阅详情，包含使用量摘要和历史记录
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SubscriptionResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/subscriptions/{id}/cancel:
+    post:
+      tags:
+        - Admin - Subscriptions
+      summary: 取消订阅
+      description: 管理员取消用户订阅，只能取消 active 或 pending 状态的订阅
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - reason
+              properties:
+                reason:
+                  type: string
+                  maxLength: 500
+                  description: 取消原因
+      responses:
+        '200':
+          description: 取消成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /admin/subscriptions/{id}/refund:
+    post:
+      tags:
+        - Admin - Subscriptions
+      summary: 退款订阅
+      description: |
+        管理员为订阅创建退款记录。
+
+        **注意**: 此 API 仅记录退款流水，不实际增加用户余额。实际退款需线下处理。
+
+        退款记录会写入 user_bills 表，Amount=0（避免污染统计），FinalAmount 记录退款金额。
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - amount
+                - reason
+              properties:
+                amount:
+                  type: integer
+                  minimum: 1
+                  description: 退款金额（分）
+                reason:
+                  type: string
+                  maxLength: 500
+                  description: 退款原因
+                refund_type:
+                  type: string
+                  enum: [manual, auto]
+                  default: manual
+                  description: 退款类型
+      responses:
+        '200':
+          description: 退款记录创建成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+                        example: "退款已记录，实际退款请走线下处理"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /admin/subscriptions/{id}/priority:
+    put:
+      tags:
+        - Admin - Subscriptions
+      summary: 更新订阅优先级
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - priority
+              properties:
+                priority:
+                  type: integer
+                  minimum: 0
+                  description: 优先级（数字越小优先级越高）
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /admin/subscriptions/{id}/activate:
+    post:
+      tags:
+        - Admin - Subscriptions
+      summary: 激活订阅
+      description: 将 pending 状态的订阅激活
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 激活成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /admin/subscriptions/{id}/expire:
+    post:
+      tags:
+        - Admin - Subscriptions
+      summary: 强制过期订阅
+      description: 将订阅强制设置为过期状态
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 过期成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  # ==================== Admin - Subscription Orders ====================
+  /admin/subscription-orders:
+    get:
+      tags:
+        - Admin - Subscription Orders
+      summary: 获取所有订单列表
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+        - name: plan_id
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, paid, cancelled, expired, failed]
+        - name: payment_channel
+          in: query
+          schema:
+            type: string
+        - name: start_time
+          in: query
+          schema:
+            type: integer
+          description: 开始时间戳
+        - name: end_time
+          in: query
+          schema:
+            type: integer
+          description: 结束时间戳
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SubscriptionOrderResponse'
+
+  /admin/subscription-orders/{id}:
+    get:
+      tags:
+        - Admin - Subscription Orders
+      summary: 获取订单详情
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SubscriptionOrderResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /admin/subscription-orders/{id}/refund:
+    post:
+      tags:
+        - Admin - Subscription Orders
+      summary: 退款订单
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - reason
+              properties:
+                reason:
+                  type: string
+                  maxLength: 500
+      responses:
+        '200':
+          description: 退款成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /admin/subscription-orders/{id}/cancel:
+    post:
+      tags:
+        - Admin - Subscription Orders
+      summary: 取消订单
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  maxLength: 500
+      responses:
+        '200':
+          description: 取消成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  # ==================== Admin - Subscription Coupons ====================
+  /admin/subscription-coupons:
+    get:
+      tags:
+        - Admin - Subscription Coupons
+      summary: 获取所有优惠券列表
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, inactive, expired]
+        - name: scope
+          in: query
+          schema:
+            type: string
+            enum: [wallet, subscription, wallet_subscription]
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [discount, full_reduction, instant_reduction]
+        - name: keyword
+          in: query
+          schema:
+            type: string
+          description: 搜索关键词（code/name）
+        - name: bind_user_id
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/CouponResponse'
+
+    post:
+      tags:
+        - Admin - Subscription Coupons
+      summary: 创建优惠券
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CouponCreateRequest'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CouponResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /admin/subscription-coupons/{id}:
+    get:
+      tags:
+        - Admin - Subscription Coupons
+      summary: 获取优惠券详情
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CouponResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Admin - Subscription Coupons
+      summary: 更新优惠券
+      description: 部分更新（PATCH 语义），只更新提供的字段。code 不可修改，total_count 只能增加。
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CouponUpdateRequest'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+    delete:
+      tags:
+        - Admin - Subscription Coupons
+      summary: 删除优惠券
+      description: 只能删除未使用的优惠券
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /admin/subscription-coupons/{id}/bind-redemption:
+    post:
+      tags:
+        - Admin - Subscription Coupons
+      summary: 绑定优惠券到兑换码
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CouponBindRequest'
+      responses:
+        '200':
+          description: 绑定成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /admin/subscription-coupons/{id}/unbind:
+    delete:
+      tags:
+        - Admin - Subscription Coupons
+      summary: 解绑优惠券
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 解绑成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /admin/subscription-coupons/{id}/bindings:
+    get:
+      tags:
+        - Admin - Subscription Coupons
+      summary: 获取优惠券绑定列表
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  # ==================== Public ====================
+  /subscription-plans:
+    get:
+      tags:
+        - Public
+      summary: 获取可用套餐列表
+      description: 获取状态为 active 的公开套餐列表（无需认证）
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SubscriptionPlanResponse'
+
+  # ==================== User - Subscriptions (New Paths - Recommended) ====================
+  /user/subscriptions:
+    get:
+      tags:
+        - User - Subscriptions
+      summary: 获取当前用户的订阅列表
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SubscriptionResponse'
+
+  /user/subscriptions/active:
+    get:
+      tags:
+        - User - Subscriptions
+      summary: 获取当前用户的活跃订阅
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SubscriptionResponse'
+
+  /user/subscriptions/{id}:
+    get:
+      tags:
+        - User - Subscriptions
+      summary: 获取订阅详情
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SubscriptionResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /user/subscriptions/{id}/usage:
+    get:
+      tags:
+        - User - Subscriptions
+      summary: 获取订阅使用量
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SubscriptionUsageResponse'
+
+  /user/subscriptions/{id}/history:
+    get:
+      tags:
+        - User - Subscriptions
+      summary: 获取订阅历史记录
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+
+  /user/subscriptions/{id}/settings:
+    put:
+      tags:
+        - User - Subscriptions
+      summary: 更新订阅设置
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                auto_wallet_fallback:
+                  type: boolean
+                  description: 是否开启自动钱包兜底
+                bind_channel_group:
+                  type: string
+                  description: 绑定渠道组
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /user/subscriptions/{id}/cancel:
+    post:
+      tags:
+        - User - Subscriptions
+      summary: 取消订阅
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: 取消原因
+      responses:
+        '200':
+          description: 取消成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /user/subscriptions/reorder:
+    post:
+      tags:
+        - User - Subscriptions
+      summary: 重新排序订阅优先级
+      description: 按传入的订阅 ID 列表顺序重新排序优先级
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - subscription_ids
+              properties:
+                subscription_ids:
+                  type: array
+                  items:
+                    type: integer
+                  description: 按优先级排序的订阅 ID 列表
+      responses:
+        '200':
+          description: 排序成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  # ==================== User - Subscription Orders ====================
+  /user/subscriptions/orders:
+    get:
+      tags:
+        - User - Subscriptions
+      summary: 获取用户订单列表
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SubscriptionOrderResponse'
+    post:
+      tags:
+        - User - Subscriptions
+      summary: 创建订单
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SubscriptionOrderResponse'
+
+  /user/subscriptions/orders/preview:
+    post:
+      tags:
+        - User - Subscriptions
+      summary: 预览订单
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - plan_id
+              properties:
+                plan_id:
+                  type: integer
+                  description: 套餐 ID
+                coupon_code:
+                  type: string
+                  description: 优惠券码
+      responses:
+        '200':
+          description: 预览成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /user/subscriptions/orders/purchase:
+    post:
+      tags:
+        - User - Subscriptions
+      summary: 一键购买订阅
+      description: 创建订单并使用钱包余额支付
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - plan_id
+              properties:
+                plan_id:
+                  type: integer
+                  description: 套餐 ID
+                coupon_code:
+                  type: string
+                  description: 优惠券码
+      responses:
+        '200':
+          description: 购买成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /user/subscriptions/orders/{id}:
+    get:
+      tags:
+        - User - Subscriptions
+      summary: 获取订单详情
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SubscriptionOrderResponse'
+
+  /user/subscriptions/orders/{id}/pay:
+    post:
+      tags:
+        - User - Subscriptions
+      summary: 支付订单
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                payment_channel:
+                  type: string
+                  enum: [wallet, free]
+                  description: 支付渠道
+      responses:
+        '200':
+          description: 支付成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /user/subscriptions/orders/{id}/cancel:
+    post:
+      tags:
+        - User - Subscriptions
+      summary: 取消订单
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 取消成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  # ==================== User - Subscriptions (Deprecated Paths) ====================
+  /subscription/self:
+    get:
+      deprecated: true
+      tags:
+        - User - Subscriptions
+      summary: 获取当前用户的订阅列表 (已废弃，请使用 /user/subscriptions)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SubscriptionResponse'
+
+  /subscription/self/active:
+    get:
+      deprecated: true
+      tags:
+        - User - Subscriptions
+      summary: 获取当前用户的活跃订阅 (已废弃，请使用 /user/subscriptions/active)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SubscriptionResponse'
+
+  /subscription/self/{id}:
+    get:
+      deprecated: true
+      tags:
+        - User - Subscriptions
+      summary: 获取订阅详情 (已废弃，请使用 /user/subscriptions/{id})
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SubscriptionResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /subscription/self/{id}/usage:
+    get:
+      deprecated: true
+      tags:
+        - User - Subscriptions
+      summary: 获取订阅使用量 (已废弃，请使用 /user/subscriptions/{id}/usage)
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SubscriptionUsageResponse'
+
+  /subscription/self/{id}/settings:
+    put:
+      deprecated: true
+      tags:
+        - User - Subscriptions
+      summary: 更新订阅设置
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubscriptionUpdateRequest'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /subscription/self/{id}/cancel:
+    post:
+      tags:
+        - User - Subscriptions
+      summary: 用户取消订阅
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  maxLength: 500
+      responses:
+        '200':
+          description: 取消成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /subscription/self/reorder:
+    post:
+      tags:
+        - User - Subscriptions
+      summary: 重新排序订阅优先级
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - subscription_ids
+              properties:
+                subscription_ids:
+                  type: array
+                  items:
+                    type: integer
+                  description: 按优先级顺序排列的订阅 ID 列表
+      responses:
+        '200':
+          description: 排序成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  # ==================== User - Coupons ====================
+  /user/coupons:
+    get:
+      tags:
+        - User - Coupons
+      summary: 获取用户的优惠券列表
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/UserCouponResponse'
+
+  /user/coupons/claim:
+    post:
+      tags:
+        - User - Coupons
+      summary: 领取优惠券
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - claim_code
+              properties:
+                claim_code:
+                  type: string
+                  maxLength: 64
+                  description: 优惠券领取码
+      responses:
+        '200':
+          description: 领取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserCouponResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /user/coupons/available:
+    get:
+      tags:
+        - User - Coupons
+      summary: 获取可领取的优惠券模板列表
+      description: |
+        获取用户可以领取的优惠券模板列表。
+        返回的是尚未被用户领取的、有效的优惠券模板，不是用户已持有的券。
+        用户需要通过 /user/coupons/claim 接口领取后才能使用。
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AvailableCouponResponse'
+
+  /user/coupons/{id}:
+    get:
+      tags:
+        - User - Coupons
+      summary: 获取优惠券详情
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserCouponResponse'
+
+  # ==================== User - Redemptions ====================
+  /user/redemptions/use:
+    post:
+      tags:
+        - User - Redemptions
+      summary: 使用兑换码
+      description: |
+        使用兑换码兑换订阅。
+        如果存在订阅冲突，需要在 redeem_option 中指定处理方式。
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UseRedemptionRequest'
+      responses:
+        '200':
+          description: 兑换结果（成功或需要用户选择）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UseRedemptionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /user/redemptions/preview:
+    post:
+      tags:
+        - User - Redemptions
+      summary: 预览兑换
+      description: 预览兑换码兑换结果，检测是否存在订阅冲突（不实际执行）
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - redemption_code
+              properties:
+                redemption_code:
+                  type: string
+                  description: 兑换码
+      responses:
+        '200':
+          description: 预览成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UseRedemptionResponse'
+
+  # ==================== User - Payment ====================
+  /user/payment/coupon/preview:
+    post:
+      tags:
+        - User - Coupons
+      summary: 优惠券使用预览
+      description: 预览使用优惠券后的价格计算结果
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CouponPreviewRequest'
+      responses:
+        '200':
+          description: 预览成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CouponPreviewResponse'
+
+  # ==================== User - Settings ====================
+  /user/settings/auto-wallet-fallback:
+    get:
+      tags:
+        - User - Settings
+      summary: 获取自动钱包兜底设置
+      description: |
+        获取用户全局的自动钱包兜底配置。
+        返回用户设置值、系统默认值、当前生效值等完整信息。
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AutoWalletFallbackResponse'
+    put:
+      tags:
+        - User - Settings
+      summary: 更新自动钱包兜底设置
+      description: |
+        更新用户全局的自动钱包兜底开关。
+        - 设置 enabled=true/false 显式指定开关状态
+        - 设置 reset=true 重置为继承系统默认值
+        - enabled 和 reset 不能同时提供
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAutoWalletFallbackRequest'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AutoWalletFallbackUpdateResponse'
+
+  # ==================== User - Subscription Settings ====================
+  /user/subscriptions/{id}/auto-wallet:
+    put:
+      tags:
+        - User - Subscriptions
+      summary: 更新订阅自动钱包兜底
+      description: 更新单个订阅的自动钱包兜底设置
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - enabled
+              properties:
+                enabled:
+                  type: boolean
+                  description: 是否开启自动钱包兜底
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          auto_wallet_fallback:
+                            type: boolean
+                            description: 更新后的自动钱包兜底状态
+
+  /user/subscriptions/priorities:
+    put:
+      tags:
+        - User - Subscriptions
+      summary: 批量更新订阅优先级
+      description: |
+        批量更新用户订阅的优先级顺序。
+        传入的订阅 ID 列表按优先级从高到低排列，列表中第一个元素优先级最高。
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - subscription_ids
+              properties:
+                subscription_ids:
+                  type: array
+                  items:
+                    type: integer
+                  description: 按优先级排序的订阅 ID 列表（第一个优先级最高）
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Token 认证
+
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+      description: 资源 ID
+
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: 页码
+
+    PageSizeParam:
+      name: page_size
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: 每页数量
+
+  responses:
+    Unauthorized:
+      description: 未授权
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            message: "未登录或 token 已过期"
+
+    BadRequest:
+      description: 请求参数错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            message: "参数验证失败"
+
+    NotFound:
+      description: 资源不存在
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            message: "资源不存在"
+
+  schemas:
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "操作成功"
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+
+    # ==================== Subscription Plan Schemas ====================
+    SubscriptionPlanRequest:
+      type: object
+      required:
+        - name
+        - price_cents
+        - billing_cycle
+      properties:
+        sku:
+          type: string
+          maxLength: 64
+          description: SKU 编码
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: 套餐名称
+        description:
+          type: string
+          description: 套餐描述
+        price_cents:
+          type: integer
+          minimum: 1
+          description: 价格（分）
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          default: CNY
+          description: 币种
+        billing_cycle:
+          type: string
+          enum: [monthly, yearly, custom]
+          description: 计费周期
+        billing_cycle_value:
+          type: integer
+          minimum: 1
+          description: 自定义计费周期值（天）
+        allow_wallet_fallback:
+          type: boolean
+          default: true
+          description: 是否允许钱包回退
+        status:
+          type: string
+          enum: [draft, active, archived]
+          default: draft
+        start_at:
+          type: integer
+          description: 生效开始时间戳
+        end_at:
+          type: integer
+          description: 生效结束时间戳
+        model_whitelist:
+          type: string
+          description: 模型白名单（逗号分隔）
+        channel_groups:
+          type: string
+          description: 渠道组（逗号分隔）
+        extra:
+          type: string
+          description: 扩展信息（JSON）
+        limits:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubscriptionPlanLimitRequest'
+          description: 限额配置
+
+    SubscriptionPlanLimitRequest:
+      type: object
+      required:
+        - period
+        - quota
+      properties:
+        period:
+          type: string
+          enum: [five_hours, day, week, month]
+          description: 限额周期
+        quota:
+          type: integer
+          minimum: 1
+          description: 限额值
+        unit:
+          type: string
+          enum: [quota, tokens, requests]
+          default: quota
+          description: 限额单位
+        enabled:
+          type: boolean
+          default: true
+        window_strategy:
+          type: string
+          enum: [rolling, fixed, natural]
+          default: rolling
+          description: 窗口策略
+
+    SubscriptionPlanResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        sku:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        price_cents:
+          type: integer
+        currency:
+          type: string
+        billing_cycle:
+          type: string
+        billing_cycle_value:
+          type: integer
+        allow_wallet_fallback:
+          type: boolean
+        status:
+          type: string
+        start_at:
+          type: integer
+        end_at:
+          type: integer
+        model_whitelist:
+          type: string
+        channel_groups:
+          type: string
+        extra:
+          type: string
+        created_at:
+          type: integer
+        updated_at:
+          type: integer
+        limits:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubscriptionPlanLimitResponse'
+
+    SubscriptionPlanLimitResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        plan_id:
+          type: integer
+        period:
+          type: string
+        quota:
+          type: integer
+        unit:
+          type: string
+        enabled:
+          type: boolean
+        window_strategy:
+          type: string
+        created_at:
+          type: integer
+        updated_at:
+          type: integer
+
+    # ==================== Subscription Schemas ====================
+    SubscriptionResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        plan_id:
+          type: integer
+        order_id:
+          type: integer
+          nullable: true
+        status:
+          type: string
+          enum: [pending, active, expired, cancelled]
+        start_at:
+          type: integer
+        end_at:
+          type: integer
+        priority:
+          type: integer
+        auto_wallet_fallback:
+          type: boolean
+        bind_channel_group:
+          type: string
+        model_whitelist_cache:
+          type: string
+        redemption_id:
+          type: integer
+          nullable: true
+        coupon_id:
+          type: integer
+          nullable: true
+        redeem_option:
+          type: string
+        metadata:
+          type: string
+        created_at:
+          type: integer
+        updated_at:
+          type: integer
+        plan_name:
+          type: string
+        remaining_days:
+          type: integer
+        is_expiring_soon:
+          type: boolean
+        usage_summary:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubscriptionUsagePeriodSummary'
+        usage_history:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubscriptionUsageHistoryItem'
+
+    SubscriptionUsagePeriodSummary:
+      type: object
+      properties:
+        period:
+          type: string
+        used_quota:
+          type: integer
+        limit_quota:
+          type: integer
+        usage_rate:
+          type: number
+          format: float
+        is_over_limit:
+          type: boolean
+
+    SubscriptionUsageHistoryItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        period:
+          type: string
+        used_quota:
+          type: integer
+        limit_quota:
+          type: integer
+        usage_rate:
+          type: number
+          format: float
+        window_start:
+          type: integer
+        window_end:
+          type: integer
+        is_over_limit:
+          type: boolean
+        created_at:
+          type: integer
+
+    SubscriptionUpdateRequest:
+      type: object
+      properties:
+        auto_wallet_fallback:
+          type: boolean
+        bind_channel_group:
+          type: string
+          maxLength: 64
+        priority:
+          type: integer
+          minimum: 0
+
+    SubscriptionUsageResponse:
+      type: object
+      properties:
+        subscription_id:
+          type: integer
+        periods:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubscriptionUsagePeriodSummary'
+
+    # ==================== Subscription Order Schemas ====================
+    SubscriptionOrderResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        plan_id:
+          type: integer
+        plan_snapshot:
+          type: string
+        coupon_id:
+          type: integer
+          nullable: true
+        coupon_snapshot:
+          type: string
+        payment_channel:
+          type: string
+        price_cents:
+          type: integer
+        discount_cents:
+          type: integer
+        final_price_cents:
+          type: integer
+        redemption_id:
+          type: integer
+          nullable: true
+        bill_id:
+          type: integer
+          nullable: true
+        status:
+          type: string
+          enum: [pending, paid, cancelled, expired, failed]
+        metadata:
+          type: string
+        created_at:
+          type: integer
+        updated_at:
+          type: integer
+
+    # ==================== Coupon Schemas ====================
+    CouponCreateRequest:
+      type: object
+      required:
+        - code
+        - name
+        - type
+        - scope
+        - discount_value
+        - currency
+        - total_count
+        - per_user_limit
+        - valid_from
+        - valid_to
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: 领取码（格式：COUPON + YYYYMMDD + 6位随机）
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+        description:
+          type: string
+        type:
+          type: string
+          enum: [discount, full_reduction, instant_reduction]
+          description: |
+            优惠券类型：
+            - discount: 折扣券（百分比）
+            - full_reduction: 满减券
+            - instant_reduction: 立减券
+        scope:
+          type: string
+          enum: [wallet, subscription, wallet_subscription]
+          description: |
+            适用范围：
+            - wallet: 余额充值
+            - subscription: 订阅
+            - wallet_subscription: 充值+订阅均可
+        discount_value:
+          type: integer
+          minimum: 1
+          description: 折扣值（百分比1-100或金额分）
+        threshold_amount:
+          type: integer
+          minimum: 0
+          description: 满减阈值（分）
+        currency:
+          type: string
+          enum: [CNY]
+        applicable_plan_ids:
+          type: array
+          items:
+            type: integer
+          description: 适用套餐 ID 列表（空表示全部）
+        total_count:
+          type: integer
+          minimum: 1
+          description: 总发行量
+        per_user_limit:
+          type: integer
+          minimum: 1
+          description: 每用户限领数量
+        valid_from:
+          type: integer
+          description: 有效期开始时间戳
+        valid_to:
+          type: integer
+          description: 有效期结束时间戳
+        status:
+          type: string
+          enum: [active, inactive, expired]
+          default: active
+        bind_user_id:
+          type: integer
+          minimum: 1
+          description: 专属用户 ID
+
+    CouponUpdateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+        description:
+          type: string
+        type:
+          type: string
+          enum: [discount, full_reduction, instant_reduction]
+        scope:
+          type: string
+          enum: [wallet, subscription, wallet_subscription]
+        discount_value:
+          type: integer
+          minimum: 1
+        threshold_amount:
+          type: integer
+          minimum: 0
+        currency:
+          type: string
+          enum: [CNY]
+        applicable_plan_ids:
+          type: array
+          items:
+            type: integer
+        total_count:
+          type: integer
+          minimum: 1
+          description: 只能增加不能减少
+        per_user_limit:
+          type: integer
+          minimum: 1
+        valid_from:
+          type: integer
+        valid_to:
+          type: integer
+        status:
+          type: string
+          enum: [active, inactive, expired]
+        bind_user_id:
+          type: integer
+          minimum: 1
+
+    CouponResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        code:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+        scope:
+          type: string
+        discount_value:
+          type: integer
+        threshold_amount:
+          type: integer
+        currency:
+          type: string
+        applicable_plan_ids:
+          type: array
+          items:
+            type: integer
+        total_count:
+          type: integer
+        used_count:
+          type: integer
+        per_user_limit:
+          type: integer
+        valid_from:
+          type: integer
+        valid_to:
+          type: integer
+        status:
+          type: string
+        bind_user_id:
+          type: integer
+          nullable: true
+        created_by:
+          type: integer
+        created_at:
+          type: integer
+        updated_at:
+          type: integer
+        is_available:
+          type: boolean
+        remaining_count:
+          type: integer
+
+    CouponBindRequest:
+      type: object
+      required:
+        - redemption_id
+      properties:
+        redemption_id:
+          type: integer
+          minimum: 1
+          description: 兑换码 ID
+        bound_user_id:
+          type: integer
+          minimum: 1
+          description: 绑定专属用户 ID（可选）
+
+    UserCouponResponse:
+      type: object
+      description: 用户已领取的优惠券（扁平结构，包含券模板信息）
+      properties:
+        id:
+          type: integer
+          description: 用户优惠券记录 ID
+        coupon_id:
+          type: integer
+          description: 优惠券模板 ID
+        code:
+          type: string
+          description: 优惠券码
+        status:
+          type: string
+          enum: [available, used, expired, locked, invalid]
+          description: |
+            券状态：
+            - available: 可用
+            - used: 已使用
+            - expired: 已过期
+            - locked: 锁定中（支付中）
+            - invalid: 无效
+        claimed_at:
+          type: integer
+          description: 领取时间戳
+        used_at:
+          type: integer
+          nullable: true
+          description: 使用时间戳
+        order_id:
+          type: integer
+          nullable: true
+          description: 关联订单 ID
+        discount_amount:
+          type: integer
+          description: 优惠金额（分）
+        final_amount:
+          type: integer
+          description: 最终金额（分）
+        created_at:
+          type: integer
+          description: 创建时间戳
+        # 优惠券模板详情（扁平展开）
+        coupon_name:
+          type: string
+          description: 优惠券名称
+        coupon_type:
+          type: string
+          enum: [discount, full_reduction, instant_reduction]
+          description: 优惠券类型
+        coupon_scope:
+          type: string
+          enum: [wallet, subscription, wallet_subscription]
+          description: 适用范围
+        discount_value:
+          type: integer
+          description: 折扣值
+        threshold_amount:
+          type: integer
+          description: 满减阈值（分）
+        currency:
+          type: string
+          description: 货币类型
+        valid_from:
+          type: integer
+          description: 有效期开始时间戳
+        valid_to:
+          type: integer
+          description: 有效期结束时间戳
+        remaining_days:
+          type: integer
+          description: 剩余有效天数
+        can_use:
+          type: boolean
+          description: 当前是否可使用
+
+    AvailableCouponResponse:
+      type: object
+      description: 可领取的优惠券模板
+      properties:
+        id:
+          type: integer
+          description: 优惠券模板 ID
+        code:
+          type: string
+          description: 优惠券码
+        name:
+          type: string
+          description: 优惠券名称
+        description:
+          type: string
+          description: 优惠券描述
+        type:
+          type: string
+          enum: [discount, full_reduction, instant_reduction]
+          description: 优惠券类型
+        scope:
+          type: string
+          enum: [wallet, subscription, wallet_subscription]
+          description: 适用范围
+        discount_value:
+          type: integer
+          description: 折扣值
+        threshold_amount:
+          type: integer
+          description: 满减阈值（分）
+        currency:
+          type: string
+          description: 货币类型
+        valid_from:
+          type: integer
+          description: 有效期开始时间戳
+        valid_to:
+          type: integer
+          description: 有效期结束时间戳
+        remaining_count:
+          type: integer
+          description: 剩余可领取数量
+        remaining_days:
+          type: integer
+          description: 剩余有效天数
+
+    CouponPreviewRequest:
+      type: object
+      required:
+        - user_coupon_id
+        - order_amount
+        - scene
+      properties:
+        user_coupon_id:
+          type: integer
+          minimum: 1
+          description: 用户优惠券 ID
+        order_amount:
+          type: integer
+          minimum: 1
+          description: 订单金额（分）
+        scene:
+          type: string
+          enum: [wallet, subscription]
+          description: 使用场景
+        plan_id:
+          type: integer
+          description: 套餐 ID（subscription 场景时可选）
+        currency:
+          type: string
+          description: 货币类型
+
+    CouponPreviewResponse:
+      type: object
+      properties:
+        valid:
+          type: boolean
+          description: 优惠券是否可用
+        error_code:
+          type: string
+          description: 错误码（无效时）
+        error_message:
+          type: string
+          description: 错误消息（无效时）
+        original_amount:
+          type: integer
+          description: 原始金额（分）
+        discount_amount:
+          type: integer
+          description: 优惠金额（分）
+        final_amount:
+          type: integer
+          description: 最终金额（分）
+        coupon_type:
+          type: string
+          description: 优惠券类型
+        threshold_met:
+          type: boolean
+          description: 是否满足满减阈值
+
+    # ==================== User Settings Schemas ====================
+    AutoWalletFallbackResponse:
+      type: object
+      description: 用户自动钱包兜底配置响应
+      properties:
+        user_setting:
+          type: boolean
+          nullable: true
+          description: 用户设置的值（数据库中的值，null 表示未设置）
+        system_default:
+          type: boolean
+          description: 系统默认值
+        effective:
+          type: boolean
+          description: 当前生效的值
+        is_explicit:
+          type: boolean
+          description: 是否为用户显式设置（false 表示使用系统默认）
+        using_system_default:
+          type: boolean
+          description: 是否正在使用系统默认值
+
+    UpdateAutoWalletFallbackRequest:
+      type: object
+      description: |
+        更新自动钱包兜底请求。
+        enabled 和 reset 不能同时提供，必须提供其中一个。
+      properties:
+        enabled:
+          type: boolean
+          description: 开关状态（显式设置）
+        reset:
+          type: boolean
+          description: 是否重置为继承系统默认（设为 true 时清除用户设置）
+
+    AutoWalletFallbackUpdateResponse:
+      type: object
+      description: 更新后的自动钱包兜底状态
+      properties:
+        auto_wallet_fallback:
+          type: boolean
+          description: 当前生效的值
+        is_explicit:
+          type: boolean
+          description: 是否为用户显式设置
+        using_system_default:
+          type: boolean
+          description: 是否正在使用系统默认值
+
+    # ==================== Redemption Schemas ====================
+    UseRedemptionRequest:
+      type: object
+      required:
+        - redemption_code
+      properties:
+        redemption_code:
+          type: string
+          description: 兑换码
+        redeem_option:
+          type: string
+          enum: [stack, coexist, convert, replace, extend]
+          description: |
+            兑换选项（可选，存在订阅冲突时需要指定）：
+            - stack: 叠加到现有订阅（同套餐）
+            - coexist: 共存（保留旧订阅，创建新订阅）
+            - convert: 转换（旧订阅折算到新订阅）
+            - replace: 替换（取消旧订阅，创建新订阅）
+            - extend: 延长（同套餐延长有效期）
+
+    UseRedemptionResponse:
+      type: object
+      description: 兑换响应（顶层字段，非 data 包裹）
+      properties:
+        success:
+          type: boolean
+          description: 兑换是否成功
+        subscription_id:
+          type: integer
+          description: 订阅 ID（成功时）
+        redeem_option:
+          type: string
+          description: 实际使用的兑换选项
+        extended_days:
+          type: integer
+          description: 延长天数（stack/extend 场景）
+        new_end_at:
+          type: integer
+          description: 新结束时间戳
+        coupon_used:
+          type: boolean
+          description: 是否使用了优惠券
+        discount_amount:
+          type: integer
+          description: 优惠金额（分）
+        idempotent:
+          type: boolean
+          description: 幂等标识（重复请求时为 true）
+        conversion_info:
+          $ref: '#/components/schemas/ConversionInfoResponse'
+        conflict:
+          $ref: '#/components/schemas/ConflictCheckResponse'
+        error_code:
+          type: string
+          description: 错误码（失败时）
+        message:
+          type: string
+          description: 消息
+
+    ConversionInfoResponse:
+      type: object
+      description: 折算信息（convert 场景）
+      properties:
+        old_subscription_id:
+          type: integer
+        old_plan_id:
+          type: integer
+        old_remaining_days:
+          type: integer
+        old_daily_price:
+          type: number
+          format: float
+          description: 旧套餐日均价（元）
+        old_remaining_value:
+          type: number
+          format: float
+          description: 旧套餐剩余价值（元）
+        new_plan_id:
+          type: integer
+        new_daily_price:
+          type: number
+          format: float
+          description: 新套餐日均价（元）
+        converted_days:
+          type: integer
+          description: 折算天数
+        remainder_amount:
+          type: number
+          format: float
+          description: 不足一天的金额（元）
+        new_subscription_end_at:
+          type: integer
+          description: 新订阅结束时间戳
+
+    ConflictCheckResponse:
+      type: object
+      description: 冲突检测响应
+      properties:
+        has_conflict:
+          type: boolean
+          description: 是否存在冲突
+        conflict_type:
+          type: string
+          enum: [same_plan, more_expensive, different_plan]
+          description: 冲突类型
+        existing_plan_id:
+          type: integer
+        existing_plan_name:
+          type: string
+        existing_plan_price:
+          type: number
+          format: float
+          description: 现有套餐价格（元）
+        new_plan_id:
+          type: integer
+        new_plan_name:
+          type: string
+        new_plan_price:
+          type: number
+          format: float
+          description: 新套餐价格（元）
+        available_options:
+          type: array
+          items:
+            type: string
+          description: 可用的处理选项
+        recommended_option:
+          type: string
+          description: 推荐的处理选项
+        conversion_preview:
+          $ref: '#/components/schemas/ConversionPreviewResponse'
+
+    ConversionPreviewResponse:
+      type: object
+      description: 折算预览
+      properties:
+        remaining_days:
+          type: integer
+        remaining_value:
+          type: number
+          format: float
+          description: 剩余价值（元）
+        converted_days:
+          type: integer
+        remainder_amount:
+          type: number
+          format: float
+          description: 不足一天的金额（元）
+        new_end_at:
+          type: integer
+
+    # 保留旧 Schema 以兼容（标记废弃）
+    RedemptionSubscriptionRequest:
+      type: object
+      deprecated: true
+      description: "已废弃，请使用 UseRedemptionRequest"
+      required:
+        - redemption_code
+      properties:
+        redemption_code:
+          type: string
+          description: 兑换码
+        redeem_option:
+          type: string
+          enum: [stack, coexist, convert, replace, extend]
+          description: 兑换选项（可选）
+
+    RedemptionSubscriptionResponse:
+      type: object
+      deprecated: true
+      description: "已废弃，请使用 UseRedemptionResponse"
+      properties:
+        subscription_id:
+          type: integer
+        message:
+          type: string

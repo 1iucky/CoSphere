@@ -31,6 +31,7 @@ import {
   renderDescription,
 } from '../../../../common/ui/RenderUtils';
 import { useIsMobile } from '../../../../../hooks/common/useIsMobile';
+import { getAssetUrl } from '../../../../../helpers/utils';
 
 function renderQuotaType(type, t) {
   switch (type) {
@@ -196,7 +197,7 @@ export const getPricingTableColumns = ({
           <IconHelpCircle
             className='text-blue-500 cursor-pointer'
             onClick={() => {
-              setModalImageUrl('/ratio.png');
+              setModalImageUrl(getAssetUrl('ratio.png'));
               setIsModalOpenurl(true);
             }}
           />

@@ -10,13 +10,14 @@ const (
 	ContextKeyRequestStartTime ContextKey = "request_start_time"
 
 	/* token related keys */
-	ContextKeyTokenUnlimited         ContextKey = "token_unlimited_quota"
-	ContextKeyTokenKey               ContextKey = "token_key"
-	ContextKeyTokenId                ContextKey = "token_id"
-	ContextKeyTokenGroup             ContextKey = "token_group"
-	ContextKeyTokenSpecificChannelId ContextKey = "specific_channel_id"
-	ContextKeyTokenModelLimitEnabled ContextKey = "token_model_limit_enabled"
-	ContextKeyTokenModelLimit        ContextKey = "token_model_limit"
+	ContextKeyTokenUnlimited             ContextKey = "token_unlimited_quota"
+	ContextKeyTokenKey                   ContextKey = "token_key"
+	ContextKeyTokenId                    ContextKey = "token_id"
+	ContextKeyTokenGroup                 ContextKey = "token_group"
+	ContextKeyTokenSpecificChannelId     ContextKey = "specific_channel_id"
+	ContextKeyTokenModelLimitEnabled     ContextKey = "token_model_limit_enabled"
+	ContextKeyTokenModelLimit            ContextKey = "token_model_limit"
+	ContextKeyTokenSubscriptionPreferred ContextKey = "token_subscription_preferred"
 
 	/* channel related keys */
 	ContextKeyChannelId                ContextKey = "channel_id"
@@ -43,10 +44,10 @@ const (
 	ContextKeyUserStatus         ContextKey = "user_status"
 	ContextKeyUserEmail          ContextKey = "user_email"
 	ContextKeyUserGroup          ContextKey = "user_group"
-	ContextKeyUsingGroup         ContextKey = "group"
-	ContextKeySelectedGroup      ContextKey = "selected_group"
-	ContextKeyAutoSmartGroupUsed ContextKey = "auto_smart_group_used"
-	ContextKeyUserName           ContextKey = "username"
+	ContextKeyUsingGroup          ContextKey = "group"
+	ContextKeySelectedGroup       ContextKey = "selected_group"
+	ContextKeyAutoSmartGroupUsed  ContextKey = "auto_smart_group_used"
+	ContextKeyUserName            ContextKey = "username"
 
 	ContextKeyLocalCountTokens ContextKey = "local_count_tokens"
 

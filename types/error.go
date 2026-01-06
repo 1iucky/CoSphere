@@ -85,6 +85,89 @@ const (
 	// quota error
 	ErrorCodeInsufficientUserQuota      ErrorCode = "insufficient_user_quota"
 	ErrorCodePreConsumeTokenQuotaFailed ErrorCode = "pre_consume_token_quota_failed"
+	ErrorCodeInsufficientBalance        ErrorCode = "insufficient_balance"
+
+	// subscription error
+	ErrorCodeSubscriptionNotFound            ErrorCode = "subscription_not_found"
+	ErrorCodeSubscriptionExpired             ErrorCode = "subscription_expired"
+	ErrorCodeSubscriptionNotActive           ErrorCode = "subscription_not_active"
+	ErrorCodeSubscriptionLimitReached        ErrorCode = "subscription_limit_reached"
+	ErrorCodeSubscriptionQuotaExhausted      ErrorCode = "subscription_quota_exhausted"
+	ErrorCodeSubscriptionConflict            ErrorCode = "subscription_conflict"
+	ErrorCodeSubscriptionCancelled           ErrorCode = "subscription_cancelled"
+	ErrorCodeSubscriptionAutoRenewalFail     ErrorCode = "subscription_auto_renewal_fail"
+	ErrorCodeSubscriptionOperationFailed     ErrorCode = "subscription_operation_failed"
+	ErrorCodeSubscriptionPriorityConflict    ErrorCode = "subscription_priority_conflict"
+	ErrorCodeSubscriptionInsufficientQuota   ErrorCode = "subscription_insufficient_quota"
+	ErrorCodeSubscriptionPlanExpired         ErrorCode = "subscription_plan_expired"
+	ErrorCodeSubscriptionPlanInactive        ErrorCode = "subscription_plan_inactive"
+
+	// subscription plan error
+	ErrorCodePlanNotFound           ErrorCode = "plan_not_found"
+	ErrorCodePlanNotAvailable       ErrorCode = "plan_not_available"
+	ErrorCodePlanNotPublished       ErrorCode = "plan_not_published"
+	ErrorCodePlanInvalidStatus      ErrorCode = "plan_invalid_status"
+	ErrorCodePlanLimitExceeded      ErrorCode = "plan_limit_exceeded"
+	ErrorCodePlanPeriodDuplicate    ErrorCode = "plan_period_duplicate"
+	ErrorCodePlanTimeConflict       ErrorCode = "plan_time_conflict"
+	ErrorCodePlanSKUDuplicate       ErrorCode = "plan_sku_duplicate"
+	ErrorCodePlanPriceInvalid       ErrorCode = "plan_price_invalid"
+	ErrorCodePlanOperationFailed    ErrorCode = "plan_operation_failed"
+	ErrorCodePlanModelInvalid       ErrorCode = "plan_model_invalid"       // 模型白名单包含无效模型
+	ErrorCodePlanChannelInvalid     ErrorCode = "plan_channel_invalid"     // 渠道分组包含无效渠道
+
+	// coupon error
+	ErrorCodeCouponNotFound           ErrorCode = "coupon_not_found"
+	ErrorCodeCouponExpired            ErrorCode = "coupon_expired"
+	ErrorCodeCouponExhausted          ErrorCode = "coupon_exhausted"
+	ErrorCodeCouponInvalidStatus      ErrorCode = "coupon_invalid_status"
+	ErrorCodeCouponAlreadyUsed        ErrorCode = "coupon_already_used"
+	ErrorCodeCouponBindingLocked      ErrorCode = "coupon_binding_locked"
+	ErrorCodeCouponPlanMismatch       ErrorCode = "coupon_plan_mismatch"
+	ErrorCodeCouponUserMismatch       ErrorCode = "coupon_user_mismatch"
+	ErrorCodeCouponUsageLimitHit      ErrorCode = "coupon_usage_limit_hit"
+	ErrorCodeCouponNotApplicable      ErrorCode = "coupon_not_applicable"
+	ErrorCodeCouponReserved           ErrorCode = "coupon_reserved"
+	ErrorCodeCouponCodeDuplicate      ErrorCode = "coupon_code_duplicate"
+	ErrorCodeCouponOperationFailed    ErrorCode = "coupon_operation_failed"
+	ErrorCodeCouponScopeMismatch      ErrorCode = "coupon_scope_mismatch"
+	ErrorCodeCouponUserLimitReached   ErrorCode = "coupon_user_limit_reached"
+	ErrorCodeCouponInsufficientQuota  ErrorCode = "coupon_insufficient_quota"
+
+	// subscription order error
+	ErrorCodeOrderNotFound        ErrorCode = "order_not_found"
+	ErrorCodeOrderInvalidStatus   ErrorCode = "order_invalid_status"
+	ErrorCodeOrderAlreadyPaid     ErrorCode = "order_already_paid"
+	ErrorCodeOrderExpired         ErrorCode = "order_expired"
+	ErrorCodeOrderPaymentFailed   ErrorCode = "order_payment_failed"
+	ErrorCodeOrderCancelled       ErrorCode = "order_cancelled"
+	ErrorCodeOrderCreationFailed  ErrorCode = "order_creation_failed"
+	ErrorCodeOrderInvalidAmount   ErrorCode = "order_invalid_amount"
+	ErrorCodeOrderAlreadyRefunded ErrorCode = "order_already_refunded"
+
+	// subscription usage error
+	ErrorCodeUsageRecordFailed    ErrorCode = "usage_record_failed"
+	ErrorCodeUsageQuotaExceeded   ErrorCode = "usage_quota_exceeded"
+	ErrorCodeUsageInvalidType     ErrorCode = "usage_invalid_type"
+
+	// user bill error
+	ErrorCodeBillNotFound         ErrorCode = "bill_not_found"
+	ErrorCodeBillGenerationFailed ErrorCode = "bill_generation_failed"
+	ErrorCodeBillAlreadyPaid      ErrorCode = "bill_already_paid"
+	ErrorCodeBillOperationFailed  ErrorCode = "bill_operation_failed"
+
+	// redemption error (extended)
+	ErrorCodeRedemptionConflict       ErrorCode = "redemption_conflict"
+	ErrorCodeRedemptionInvalidType    ErrorCode = "redemption_invalid_type"
+	ErrorCodeRedemptionExpired        ErrorCode = "redemption_expired"
+	ErrorCodeRedemptionUsed           ErrorCode = "redemption_used"
+	ErrorCodeRedemptionInvalid        ErrorCode = "redemption_invalid"
+	ErrorCodeRedemptionNotFound       ErrorCode = "redemption_not_found"
+	ErrorCodeRedemptionOperationFailed ErrorCode = "redemption_operation_failed"
+
+	// validation and request error
+	ErrorCodeInvalidRequestParams       ErrorCode = "invalid_request_params"
+	ErrorCodeSubscriptionMaxLimitReached ErrorCode = "subscription_max_limit_reached"
 )
 
 type NewAPIError struct {

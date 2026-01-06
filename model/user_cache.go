@@ -137,6 +137,11 @@ func cacheDecrUserQuota(userId int, delta int64) error {
 	return cacheIncrUserQuota(userId, -delta)
 }
 
+// AdjustUserQuotaCache 手动调整用户额度缓存（用于事务外同步）
+func AdjustUserQuotaCache(userId int, delta int64) error {
+	return cacheIncrUserQuota(userId, delta)
+}
+
 // Helper functions to get individual fields if needed
 func getUserGroupCache(userId int) (string, error) {
 	cache, err := GetUserCache(userId)

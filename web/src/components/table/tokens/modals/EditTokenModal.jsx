@@ -77,6 +77,7 @@ const EditTokenModal = (props) => {
     group: '',
     group_priorities_array: [],
     auto_smart_group: false,
+    subscription_preferred: false,
     tokenCount: 1,
   });
 
@@ -445,7 +446,15 @@ const EditTokenModal = (props) => {
                       field='auto_smart_group'
                       label={t('自动分组')}
                       size='large'
-                      extraText={t('当调用模型不在选择的分组时，将自动定向分组')}
+                      extraText={t('当分组优先级不可用时，将按费率自动选择可用分组')}
+                    />
+                  </Col>
+                  <Col span={24}>
+                    <Form.Switch
+                      field='subscription_preferred'
+                      label={t('订阅优先计费')}
+                      size='large'
+                      extraText={t('开启后优先使用订阅额度扣费，关闭则跳过订阅并使用余额/令牌分组')}
                     />
                   </Col>
                   <Col xs={24} sm={24} md={24} lg={10} xl={10}>

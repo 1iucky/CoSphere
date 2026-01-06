@@ -115,8 +115,13 @@ const renderGroupColumn = (text, record, t) => {
       <div>
         <div className='text-sm font-medium'>{displayText}</div>
         {record.auto_smart_group && (
+          <Tag size='small' color='blue' className='mt-1'>
+            {t('自动分组')}
+          </Tag>
+        )}
+        {record.subscription_preferred && (
           <Tag size='small' color='green' className='mt-1'>
-            {t('智能分组')}
+            {t('订阅优先计费')}
           </Tag>
         )}
       </div>
@@ -143,8 +148,13 @@ const renderGroupColumn = (text, record, t) => {
     <div>
       {fallback}
       {record.auto_smart_group && (
+        <Tag size='small' color='blue' className='mt-1'>
+          {t('自动分组')}
+        </Tag>
+      )}
+      {record.subscription_preferred && (
         <Tag size='small' color='green' className='mt-1'>
-          {t('智能分组')}
+          {t('订阅优先计费')}
         </Tag>
       )}
     </div>

@@ -25,6 +25,7 @@ const { vitePluginSemi } = pkg;
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: '/cosphere/',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

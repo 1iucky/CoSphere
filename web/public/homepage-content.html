@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CoSphere - AI Gateway & Asset Management</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            /* Light theme colors */
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-card: #ffffff;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --text-tertiary: #94a3b8;
+            --accent-primary: #10b981;
+            --accent-secondary: #059669;
+            --accent-gradient: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            --border-color: #e2e8f0;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+            --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        [data-theme="dark"] {
+            /* Dark theme colors */
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-card: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --text-tertiary: #94a3b8;
+            --accent-primary: #10b981;
+            --accent-secondary: #059669;
+            --border-color: #334155;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+            --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.5);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* Hero Section */
+        .hero {
+            padding: 80px 0 60px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 50% 0%, rgba(16, 185, 129, 0.1) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 700;
+            margin-bottom: 24px;
+            line-height: 1.2;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            margin-bottom: 40px;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .hero-features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .hero-feature {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .hero-feature:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--accent-primary);
+        }
+
+        .hero-feature-icon {
+            font-size: 2rem;
+            margin-bottom: 12px;
+        }
+
+        .hero-feature-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: var(--text-primary);
+        }
+
+        .hero-feature-desc {
+            font-size: 0.875rem;
+            color: var(--text-tertiary);
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 14px 32px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--accent-gradient);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--text-primary);
+            border: 2px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+
+        /* Features Section */
+        .features {
+            padding: 60px 0;
+            background: var(--bg-secondary);
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .section-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+        }
+
+        .section-subtitle {
+            font-size: 1.125rem;
+            color: var(--text-secondary);
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 32px;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 32px;
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-8px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--accent-primary);
+        }
+
+        .feature-icon {
+            width: 56px;
+            height: 56px;
+            background: var(--accent-gradient);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.75rem;
+            margin-bottom: 20px;
+        }
+
+        .feature-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--text-primary);
+        }
+
+        .feature-desc {
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+
+        /* Pricing Section */
+        .pricing {
+            padding: 60px 0;
+        }
+
+        .pricing-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 32px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .pricing-card {
+            background: var(--bg-card);
+            border: 2px solid var(--border-color);
+            border-radius: 16px;
+            padding: 40px 32px;
+            text-align: center;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .pricing-card.featured {
+            border-color: var(--accent-primary);
+            transform: scale(1.05);
+        }
+
+        .pricing-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .pricing-badge {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--accent-gradient);
+            color: white;
+            padding: 6px 20px;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .pricing-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+
+        .pricing-desc {
+            color: var(--text-tertiary);
+            margin-bottom: 24px;
+            font-size: 0.9rem;
+        }
+
+        .pricing-price {
+            font-size: 3rem;
+            font-weight: 700;
+            color: var(--accent-primary);
+            margin-bottom: 8px;
+        }
+
+        .pricing-period {
+            color: var(--text-tertiary);
+            margin-bottom: 32px;
+        }
+
+        .pricing-features {
+            list-style: none;
+            margin-bottom: 32px;
+            text-align: left;
+        }
+
+        .pricing-features li {
+            padding: 12px 0;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .pricing-features li::before {
+            content: '✓';
+            color: var(--accent-primary);
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        /* Stats Section */
+        .stats {
+            padding: 60px 0;
+            background: var(--bg-secondary);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 40px;
+            text-align: center;
+        }
+
+        .stat-item {
+            padding: 20px;
+        }
+
+        .stat-value {
+            font-size: 3rem;
+            font-weight: 700;
+            color: var(--accent-primary);
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 1rem;
+            color: var(--text-secondary);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+
+            .hero p {
+                font-size: 1.125rem;
+            }
+
+            .section-title {
+                font-size: 2rem;
+            }
+
+            .pricing-card.featured {
+                transform: scale(1);
+            }
+
+            .hero-features {
+                grid-template-columns: 1fr;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .pricing-cards {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div data-theme="light" id="app">
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="container">
+                <h1 data-i18n="hero.title">AI 驱动的完整开发平台</h1>
+                <p data-i18n="hero.subtitle">统一的 AI 网关和资产管理系统，支持所有主流模型，简化 API 管理，降低使用成本</p>
+
+                <div class="hero-features">
+                    <div class="hero-feature">
+                        <div class="hero-feature-icon">🚀</div>
+                        <div class="hero-feature-title" data-i18n="hero.feature1.title">统一接入</div>
+                        <div class="hero-feature-desc" data-i18n="hero.feature1.desc">一个 API 访问所有模型</div>
+                    </div>
+                    <div class="hero-feature">
+                        <div class="hero-feature-icon">💰</div>
+                        <div class="hero-feature-title" data-i18n="hero.feature2.title">成本优化</div>
+                        <div class="hero-feature-desc" data-i18n="hero.feature2.desc">智能路由降低 80% 成本</div>
+                    </div>
+                    <div class="hero-feature">
+                        <div class="hero-feature-icon">🤖</div>
+                        <div class="hero-feature-title" data-i18n="hero.feature3.title">多模型支持</div>
+                        <div class="hero-feature-desc" data-i18n="hero.feature3.desc">20+ AI 模型随意切换</div>
+                    </div>
+                    <div class="hero-feature">
+                        <div class="hero-feature-icon">⚡</div>
+                        <div class="hero-feature-title" data-i18n="hero.feature4.title">快速部署</div>
+                        <div class="hero-feature-desc" data-i18n="hero.feature4.desc">3 分钟完成配置</div>
+                    </div>
+                </div>
+
+                <div class="cta-buttons">
+                    <a href="#" class="btn btn-primary" data-i18n="hero.cta.primary">
+                        <span>开始使用</span>
+                        <span>→</span>
+                    </a>
+                    <a href="#features" class="btn btn-secondary" data-i18n="hero.cta.secondary">了解更多</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section class="features" id="features">
+            <div class="container">
+                <div class="section-header">
+                    <h2 class="section-title" data-i18n="features.title">强大功能，开箱即用</h2>
+                    <p class="section-subtitle" data-i18n="features.subtitle">为专业开发者和团队打造的全方位解决方案</p>
+                </div>
+
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">🌐</div>
+                        <h3 class="feature-title" data-i18n="features.universal.title">统一模型接入</h3>
+                        <p class="feature-desc" data-i18n="features.universal.desc">支持 Claude、GPT、Gemini、通义千问等 20+ 主流 AI 模型，一个 API 密钥访问所有模型</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🎯</div>
+                        <h3 class="feature-title" data-i18n="features.routing.title">智能路由</h3>
+                        <p class="feature-desc" data-i18n="features.routing.desc">根据任务特点自动选择最优模型，平衡性能、成本和质量，实现最佳效果</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🔒</div>
+                        <h3 class="feature-title" data-i18n="features.security.title">企业级安全</h3>
+                        <p class="feature-desc" data-i18n="features.security.desc">SOC 2 合规，端到端加密，数据本地处理，银行级安全标准保护您的数据</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">📊</div>
+                        <h3 class="feature-title" data-i18n="features.analytics.title">使用分析</h3>
+                        <p class="feature-desc" data-i18n="features.analytics.desc">实时追踪令牌使用、成本优化、性能监控，全面掌控 AI 资产使用情况</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">⚙️</div>
+                        <h3 class="feature-title" data-i18n="features.workflow.title">自定义工作流</h3>
+                        <p class="feature-desc" data-i18n="features.workflow.desc">创建个性化 AI 自动化管道，适配您的开发风格，提升团队协作效率</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">👥</div>
+                        <h3 class="feature-title" data-i18n="features.team.title">团队协作</h3>
+                        <p class="feature-desc" data-i18n="features.team.desc">多用户管理、配额分配、权限控制，满足企业级团队协作需求</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Pricing Section -->
+        <section class="pricing" id="pricing">
+            <div class="container">
+                <div class="section-header">
+                    <h2 class="section-title" data-i18n="pricing.title">灵活的定价方案</h2>
+                    <p class="section-subtitle" data-i18n="pricing.subtitle">从免费试用到企业级方案，总有一款适合您</p>
+                </div>
+
+                <div class="pricing-cards">
+                    <div class="pricing-card">
+                        <h3 class="pricing-title" data-i18n="pricing.free.title">免费版</h3>
+                        <p class="pricing-desc" data-i18n="pricing.free.desc">适合个人开发者试用</p>
+                        <div class="pricing-price">$0</div>
+                        <div class="pricing-period" data-i18n="pricing.free.period">/月</div>
+                        <ul class="pricing-features">
+                            <li data-i18n="pricing.free.feature1">每日 $1 使用额度</li>
+                            <li data-i18n="pricing.free.feature2">访问所有 AI 模型</li>
+                            <li data-i18n="pricing.free.feature3">基础功能支持</li>
+                            <li data-i18n="pricing.free.feature4">社区支持</li>
+                        </ul>
+                        <a href="#" class="btn btn-secondary" style="width: 100%;" data-i18n="pricing.free.cta">开始免费使用</a>
+                    </div>
+
+                    <div class="pricing-card featured">
+                        <div class="pricing-badge" data-i18n="pricing.pro.badge">推荐</div>
+                        <h3 class="pricing-title" data-i18n="pricing.pro.title">专业版</h3>
+                        <p class="pricing-desc" data-i18n="pricing.pro.desc">适合专业开发者和小型团队</p>
+                        <div class="pricing-price">$60</div>
+                        <div class="pricing-period" data-i18n="pricing.pro.period">/月</div>
+                        <ul class="pricing-features">
+                            <li data-i18n="pricing.pro.feature1">每日 $80 使用额度</li>
+                            <li data-i18n="pricing.pro.feature2">无请求速率限制</li>
+                            <li data-i18n="pricing.pro.feature3">优先模型切换</li>
+                            <li data-i18n="pricing.pro.feature4">成本分析面板</li>
+                            <li data-i18n="pricing.pro.feature5">最多 5 个团队席位</li>
+                            <li data-i18n="pricing.pro.feature6">优先技术支持</li>
+                        </ul>
+                        <a href="#" class="btn btn-primary" style="width: 100%;" data-i18n="pricing.pro.cta">立即购买</a>
+                    </div>
+
+                    <div class="pricing-card">
+                        <h3 class="pricing-title" data-i18n="pricing.enterprise.title">企业版</h3>
+                        <p class="pricing-desc" data-i18n="pricing.enterprise.desc">适合大型团队和企业</p>
+                        <div class="pricing-price" data-i18n="pricing.enterprise.price">定制</div>
+                        <div class="pricing-period" data-i18n="pricing.enterprise.period">按需定价</div>
+                        <ul class="pricing-features">
+                            <li data-i18n="pricing.enterprise.feature1">无限使用额度</li>
+                            <li data-i18n="pricing.enterprise.feature2">无限团队席位</li>
+                            <li data-i18n="pricing.enterprise.feature3">定制模型微调</li>
+                            <li data-i18n="pricing.enterprise.feature4">专用基础设施</li>
+                            <li data-i18n="pricing.enterprise.feature5">高级安全与合规</li>
+                            <li data-i18n="pricing.enterprise.feature6">私有部署选项</li>
+                        </ul>
+                        <a href="#" class="btn btn-secondary" style="width: 100%;" data-i18n="pricing.enterprise.cta">联系销售</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Stats Section -->
+        <section class="stats">
+            <div class="container">
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value">20+</div>
+                        <div class="stat-label" data-i18n="stats.models">AI 模型</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">99.9%</div>
+                        <div class="stat-label" data-i18n="stats.uptime">服务可用性</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">80%</div>
+                        <div class="stat-label" data-i18n="stats.savings">成本节省</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">&lt;100ms</div>
+                        <div class="stat-label" data-i18n="stats.latency">响应延迟</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        // 国际化翻译
+        const translations = {
+            zh: {
+                'hero.title': 'AI 驱动的完整开发平台',
+                'hero.subtitle': '统一的 AI 网关和资产管理系统，支持所有主流模型，简化 API 管理，降低使用成本',
+                'hero.feature1.title': '统一接入',
+                'hero.feature1.desc': '一个 API 访问所有模型',
+                'hero.feature2.title': '成本优化',
+                'hero.feature2.desc': '智能路由降低 80% 成本',
+                'hero.feature3.title': '多模型支持',
+                'hero.feature3.desc': '20+ AI 模型随意切换',
+                'hero.feature4.title': '快速部署',
+                'hero.feature4.desc': '3 分钟完成配置',
+                'hero.cta.primary': '开始使用',
+                'hero.cta.secondary': '了解更多',
+                'features.title': '强大功能，开箱即用',
+                'features.subtitle': '为专业开发者和团队打造的全方位解决方案',
+                'features.universal.title': '统一模型接入',
+                'features.universal.desc': '支持 Claude、GPT、Gemini、通义千问等 20+ 主流 AI 模型，一个 API 密钥访问所有模型',
+                'features.routing.title': '智能路由',
+                'features.routing.desc': '根据任务特点自动选择最优模型，平衡性能、成本和质量，实现最佳效果',
+                'features.security.title': '企业级安全',
+                'features.security.desc': 'SOC 2 合规，端到端加密，数据本地处理，银行级安全标准保护您的数据',
+                'features.analytics.title': '使用分析',
+                'features.analytics.desc': '实时追踪令牌使用、成本优化、性能监控，全面掌控 AI 资产使用情况',
+                'features.workflow.title': '自定义工作流',
+                'features.workflow.desc': '创建个性化 AI 自动化管道，适配您的开发风格，提升团队协作效率',
+                'features.team.title': '团队协作',
+                'features.team.desc': '多用户管理、配额分配、权限控制，满足企业级团队协作需求',
+                'pricing.title': '灵活的定价方案',
+                'pricing.subtitle': '从免费试用到企业级方案，总有一款适合您',
+                'pricing.free.title': '免费版',
+                'pricing.free.desc': '适合个人开发者试用',
+                'pricing.free.period': '/月',
+                'pricing.free.feature1': '每日 $1 使用额度',
+                'pricing.free.feature2': '访问所有 AI 模型',
+                'pricing.free.feature3': '基础功能支持',
+                'pricing.free.feature4': '社区支持',
+                'pricing.free.cta': '开始免费使用',
+                'pricing.pro.badge': '推荐',
+                'pricing.pro.title': '专业版',
+                'pricing.pro.desc': '适合专业开发者和小型团队',
+                'pricing.pro.period': '/月',
+                'pricing.pro.feature1': '每日 $80 使用额度',
+                'pricing.pro.feature2': '无请求速率限制',
+                'pricing.pro.feature3': '优先模型切换',
+                'pricing.pro.feature4': '成本分析面板',
+                'pricing.pro.feature5': '最多 5 个团队席位',
+                'pricing.pro.feature6': '优先技术支持',
+                'pricing.pro.cta': '立即购买',
+                'pricing.enterprise.title': '企业版',
+                'pricing.enterprise.desc': '适合大型团队和企业',
+                'pricing.enterprise.price': '定制',
+                'pricing.enterprise.period': '按需定价',
+                'pricing.enterprise.feature1': '无限使用额度',
+                'pricing.enterprise.feature2': '无限团队席位',
+                'pricing.enterprise.feature3': '定制模型微调',
+                'pricing.enterprise.feature4': '专用基础设施',
+                'pricing.enterprise.feature5': '高级安全与合规',
+                'pricing.enterprise.feature6': '私有部署选项',
+                'pricing.enterprise.cta': '联系销售',
+                'stats.models': 'AI 模型',
+                'stats.uptime': '服务可用性',
+                'stats.savings': '成本节省',
+                'stats.latency': '响应延迟'
+            },
+            en: {
+                'hero.title': 'Complete AI-Powered Development Platform',
+                'hero.subtitle': 'Unified AI gateway and asset management system supporting all major models, simplifying API management and reducing costs',
+                'hero.feature1.title': 'Unified Access',
+                'hero.feature1.desc': 'One API for all models',
+                'hero.feature2.title': 'Cost Optimization',
+                'hero.feature2.desc': 'Smart routing saves 80%',
+                'hero.feature3.title': 'Multi-Model',
+                'hero.feature3.desc': '20+ AI models available',
+                'hero.feature4.title': 'Quick Setup',
+                'hero.feature4.desc': '3-minute configuration',
+                'hero.cta.primary': 'Get Started',
+                'hero.cta.secondary': 'Learn More',
+                'features.title': 'Powerful Features, Ready to Use',
+                'features.subtitle': 'Comprehensive solution built for professional developers and teams',
+                'features.universal.title': 'Universal Model Access',
+                'features.universal.desc': 'Access Claude, GPT, Gemini, Qwen and 20+ mainstream AI models with one API key',
+                'features.routing.title': 'Intelligent Routing',
+                'features.routing.desc': 'Automatically select the best model based on task characteristics, balancing performance, cost and quality',
+                'features.security.title': 'Enterprise Security',
+                'features.security.desc': 'SOC 2 compliant, end-to-end encryption, local data processing with bank-level security standards',
+                'features.analytics.title': 'Usage Analytics',
+                'features.analytics.desc': 'Real-time tracking of token usage, cost optimization, and performance monitoring',
+                'features.workflow.title': 'Custom Workflows',
+                'features.workflow.desc': 'Create personalized AI automation pipelines that fit your development style',
+                'features.team.title': 'Team Collaboration',
+                'features.team.desc': 'Multi-user management, quota allocation, and permission control for enterprise teams',
+                'pricing.title': 'Flexible Pricing Plans',
+                'pricing.subtitle': 'From free trial to enterprise, there\'s a plan for you',
+                'pricing.free.title': 'Free',
+                'pricing.free.desc': 'Perfect for individual developers',
+                'pricing.free.period': '/month',
+                'pricing.free.feature1': '$1 daily usage quota',
+                'pricing.free.feature2': 'Access to all AI models',
+                'pricing.free.feature3': 'Basic features',
+                'pricing.free.feature4': 'Community support',
+                'pricing.free.cta': 'Start Free',
+                'pricing.pro.badge': 'Popular',
+                'pricing.pro.title': 'Professional',
+                'pricing.pro.desc': 'For professional developers and small teams',
+                'pricing.pro.period': '/month',
+                'pricing.pro.feature1': '$80 daily usage quota',
+                'pricing.pro.feature2': 'No rate limits',
+                'pricing.pro.feature3': 'Priority model switching',
+                'pricing.pro.feature4': 'Cost analytics dashboard',
+                'pricing.pro.feature5': 'Up to 5 team seats',
+                'pricing.pro.feature6': 'Priority support',
+                'pricing.pro.cta': 'Buy Now',
+                'pricing.enterprise.title': 'Enterprise',
+                'pricing.enterprise.desc': 'For large teams and enterprises',
+                'pricing.enterprise.price': 'Custom',
+                'pricing.enterprise.period': 'Custom pricing',
+                'pricing.enterprise.feature1': 'Unlimited usage quota',
+                'pricing.enterprise.feature2': 'Unlimited team seats',
+                'pricing.enterprise.feature3': 'Custom model fine-tuning',
+                'pricing.enterprise.feature4': 'Dedicated infrastructure',
+                'pricing.enterprise.feature5': 'Advanced security & compliance',
+                'pricing.enterprise.feature6': 'Private deployment option',
+                'pricing.enterprise.cta': 'Contact Sales',
+                'stats.models': 'AI Models',
+                'stats.uptime': 'Uptime SLA',
+                'stats.savings': 'Cost Savings',
+                'stats.latency': 'Response Time'
+            }
+        };
+
+        // 当前语言和主题
+        let currentLang = 'zh';
+        let currentTheme = 'light';
+
+        // 应用翻译
+        function applyTranslations(lang) {
+            const t = translations[lang] || translations.zh;
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (t[key]) {
+                    el.textContent = t[key];
+                }
+            });
+        }
+
+        // 应用主题
+        function applyTheme(theme) {
+            const app = document.getElementById('app');
+            app.setAttribute('data-theme', theme);
+        }
+
+        // 监听来自父页面的消息
+        window.addEventListener('message', function(event) {
+            // 接收语言切换消息
+            if (event.data && event.data.lang) {
+                currentLang = event.data.lang;
+                applyTranslations(currentLang);
+            }
+
+            // 接收主题切换消息
+            if (event.data && event.data.themeMode) {
+                currentTheme = event.data.themeMode;
+                applyTheme(currentTheme);
+            }
+        });
+
+        // 初始化
+        applyTranslations(currentLang);
+        applyTheme(currentTheme);
+
+        // 通知父页面已加载完成
+        if (window.parent !== window) {
+            window.parent.postMessage({ type: 'homepage-ready' }, '*');
+        }
+    </script>
+</body>
+</html>

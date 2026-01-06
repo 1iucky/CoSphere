@@ -44,6 +44,7 @@ import PricingCardSkeleton from './PricingCardSkeleton';
 import { useMinimumLoadingTime } from '../../../../../hooks/common/useMinimumLoadingTime';
 import { renderLimitedItems } from '../../../../common/ui/RenderUtils';
 import { useIsMobile } from '../../../../../hooks/common/useIsMobile';
+import { getAssetUrl } from '../../../../../helpers/utils';
 
 const CARD_STYLES = {
   container:
@@ -326,7 +327,7 @@ const PricingCardView = ({
                             size='small'
                             onClick={(e) => {
                               e.stopPropagation();
-                              setModalImageUrl('/ratio.png');
+                              setModalImageUrl(getAssetUrl('ratio.png'));
                               setIsModalOpenurl(true);
                             }}
                           />

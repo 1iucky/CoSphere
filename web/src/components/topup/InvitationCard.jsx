@@ -28,6 +28,7 @@ import {
   Space,
 } from '@douyinfe/semi-ui';
 import { Copy, Users, BarChart2, TrendingUp, Gift, Zap } from 'lucide-react';
+import { getAssetUrl } from '../../helpers/utils';
 
 const { Text } = Typography;
 
@@ -64,7 +65,7 @@ const InvitationCard = ({
               className='relative h-30'
               style={{
                 '--palette-primary-darkerChannel': '0 75 80',
-                backgroundImage: `linear-gradient(0deg, rgba(var(--palette-primary-darkerChannel) / 80%), rgba(var(--palette-primary-darkerChannel) / 80%)), url('/cover-4.webp')`,
+                backgroundImage: `linear-gradient(0deg, rgba(var(--palette-primary-darkerChannel) / 80%), rgba(var(--palette-primary-darkerChannel) / 80%)), url('${getAssetUrl('cover-4.webp')}')`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',

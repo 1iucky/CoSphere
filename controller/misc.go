@@ -44,6 +44,7 @@ func GetStatus(c *gin.Context) {
 	defer common.OptionMapRWMutex.RUnlock()
 
 	passkeySetting := system_setting.GetPasskeySettings()
+	googleSetting := system_setting.GetGoogleSettings()
 	legalSetting := system_setting.GetLegalSettings()
 
 	data := gin.H{
@@ -52,6 +53,8 @@ func GetStatus(c *gin.Context) {
 		"email_verification":          common.EmailVerificationEnabled,
 		"github_oauth":                common.GitHubOAuthEnabled,
 		"github_client_id":            common.GitHubClientId,
+		"google_oauth":                googleSetting.Enabled,
+		"google_client_id":            googleSetting.ClientId,
 		"discord_oauth":               system_setting.GetDiscordSettings().Enabled,
 		"discord_client_id":           system_setting.GetDiscordSettings().ClientId,
 		"linuxdo_oauth":               common.LinuxDOOAuthEnabled,

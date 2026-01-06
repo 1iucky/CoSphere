@@ -64,7 +64,6 @@ func geminiRelayHandler(c *gin.Context, info *relaycommon.RelayInfo) *types.NewA
 func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 	requestId := c.GetString(common.RequestIdKey)
-	group := common.GetContextKeyString(c, constant.ContextKeyUsingGroup)
 	originalModel := common.GetContextKeyString(c, constant.ContextKeyOriginalModel)
 
 	var (
@@ -115,6 +114,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	}
 
 	meta := request.GetTokenCountMeta()
+	common.SetContextKey(c, constant.ContextKeyTokenCountMeta, meta)
 
 	if setting.ShouldCheckPromptSensitive() {
 		contains, words := service.CheckSensitiveText(meta.CombineText)
@@ -149,6 +149,8 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			return
 		}
 	}
+
+	group := common.GetContextKeyString(c, constant.ContextKeyUsingGroup)
 
 	defer func() {
 		// Only return quota if downstream failed and quota was actually pre-consumed

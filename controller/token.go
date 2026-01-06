@@ -223,6 +223,7 @@ func AddToken(c *gin.Context) {
 		AllowIps:           tokenReq.AllowIps,
 		Group:              trimmedGroup,
 		AutoSmartGroup:     tokenReq.AutoSmartGroup,
+		SubscriptionPreferred:     tokenReq.SubscriptionPreferred,
 	}
 
 	// 处理分组优先级
@@ -329,6 +330,7 @@ func UpdateToken(c *gin.Context) {
 		cleanToken.AllowIps = tokenReq.AllowIps
 		cleanToken.Group = strings.TrimSpace(tokenReq.Group)
 		cleanToken.AutoSmartGroup = tokenReq.AutoSmartGroup
+		cleanToken.SubscriptionPreferred = tokenReq.SubscriptionPreferred
 
 		// 处理分组优先级
 		if len(tokenReq.GroupPrioritiesArray) > 0 {

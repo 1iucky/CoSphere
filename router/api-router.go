@@ -30,6 +30,7 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.GET("/reset_password", middleware.CriticalRateLimit(), middleware.TurnstileCheck(), controller.SendPasswordResetEmail)
 		apiRouter.POST("/user/reset", middleware.CriticalRateLimit(), controller.ResetPassword)
 		apiRouter.GET("/oauth/github", middleware.CriticalRateLimit(), controller.GitHubOAuth)
+		apiRouter.GET("/oauth/google", middleware.CriticalRateLimit(), controller.GoogleOAuth)
 		apiRouter.GET("/oauth/discord", middleware.CriticalRateLimit(), controller.DiscordOAuth)
 		apiRouter.GET("/oauth/oidc", middleware.CriticalRateLimit(), controller.OidcAuth)
 		apiRouter.GET("/oauth/linuxdo", middleware.CriticalRateLimit(), controller.LinuxdoOAuth)
@@ -255,6 +256,160 @@ func SetApiRouter(router *gin.Engine) {
 			modelsRoute.POST("/", controller.CreateModelMeta)
 			modelsRoute.PUT("/", controller.UpdateModelMeta)
 			modelsRoute.DELETE("/:id", controller.DeleteModelMeta)
+		}
+
+		// ===================== 订阅系统路由 =====================
+
+		// Admin 套餐管理路由
+		subscriptionPlanRoute := apiRouter.Group("/admin/subscription-plans")
+		subscriptionPlanRoute.Use(middleware.AdminAuth())
+		{
+			subscriptionPlanRoute.GET("/", controller.GetAllSubscriptionPlans)
+			subscriptionPlanRoute.GET("/:id", controller.GetSubscriptionPlan)
+			subscriptionPlanRoute.POST("/", controller.CreateSubscriptionPlan)
+			subscriptionPlanRoute.PUT("/:id", controller.UpdateSubscriptionPlan)
+			subscriptionPlanRoute.POST("/:id/publish", controller.PublishSubscriptionPlan)
+			subscriptionPlanRoute.POST("/:id/unpublish", controller.UnpublishSubscriptionPlan)
+			subscriptionPlanRoute.DELETE("/:id", controller.DeleteSubscriptionPlan)
+		}
+
+		// Admin 订阅管理路由
+		subscriptionRoute := apiRouter.Group("/admin/subscriptions")
+		subscriptionRoute.Use(middleware.AdminAuth())
+		{
+			subscriptionRoute.GET("/", controller.GetAllSubscriptions)
+			subscriptionRoute.GET("/:id", controller.GetSubscriptionAdmin)
+			subscriptionRoute.POST("/:id/cancel", controller.CancelSubscriptionAdmin)
+			subscriptionRoute.POST("/:id/refund", controller.RefundSubscriptionAdmin)
+			subscriptionRoute.PUT("/:id/priority", controller.UpdateSubscriptionPriorityAdmin)
+			subscriptionRoute.POST("/:id/activate", controller.ActivateSubscriptionAdmin)
+			subscriptionRoute.POST("/:id/expire", controller.ExpireSubscriptionAdmin)
+		}
+
+		// Admin 订单管理路由
+		subscriptionOrderRoute := apiRouter.Group("/admin/subscription-orders")
+		subscriptionOrderRoute.Use(middleware.AdminAuth())
+		{
+			subscriptionOrderRoute.GET("/", controller.GetAllSubscriptionOrders)
+			subscriptionOrderRoute.GET("/:id", controller.GetSubscriptionOrder)
+			subscriptionOrderRoute.POST("/:id/refund", controller.RefundSubscriptionOrder)
+			subscriptionOrderRoute.POST("/:id/cancel", controller.CancelSubscriptionOrderAdmin)
+		}
+
+		// Admin 优惠券管理路由
+		subscriptionCouponRoute := apiRouter.Group("/admin/subscription-coupons")
+		subscriptionCouponRoute.Use(middleware.AdminAuth())
+		{
+			subscriptionCouponRoute.GET("/", controller.GetAllSubscriptionCoupons)
+			subscriptionCouponRoute.GET("/:id", controller.GetSubscriptionCoupon)
+			subscriptionCouponRoute.POST("/", controller.CreateSubscriptionCoupon)
+			subscriptionCouponRoute.PUT("/:id", controller.UpdateSubscriptionCoupon)
+			subscriptionCouponRoute.DELETE("/:id", controller.DeleteSubscriptionCoupon)
+			subscriptionCouponRoute.POST("/:id/bind-redemption", controller.BindCouponToRedemption)
+			subscriptionCouponRoute.DELETE("/:id/unbind", controller.UnbindCouponFromRedemption)
+			subscriptionCouponRoute.GET("/:id/bindings", controller.GetCouponBindings)
+		}
+
+		// 公开套餐查询路由（无需登录）
+		apiRouter.GET("/subscription-plans", controller.GetAvailablePlans)
+		apiRouter.GET("/subscription-plans/:id", controller.GetAvailablePlanDetail)
+
+		// 用户套餐查询路由（兼容规格 /api/user/subscription-plans）
+		userPlanRoute := apiRouter.Group("/user/subscription-plans")
+		userPlanRoute.Use(middleware.UserAuth())
+		{
+			userPlanRoute.GET("", controller.GetAvailablePlans)
+			userPlanRoute.GET("/:id", controller.GetAvailablePlanDetail)
+		}
+
+		// 用户订阅管理路由（兼容规格 /api/user/subscriptions/*）
+		userSubscriptionsRoute := apiRouter.Group("/user/subscriptions")
+		userSubscriptionsRoute.Use(middleware.UserAuth())
+		{
+			// 订阅列表和详情
+			userSubscriptionsRoute.GET("", controller.GetUserSubscriptions)
+			userSubscriptionsRoute.GET("/active", controller.GetUserActiveSubscriptions)
+			userSubscriptionsRoute.GET("/:id", controller.GetUserSubscriptionDetail)
+			userSubscriptionsRoute.GET("/:id/usage", controller.GetUserSubscriptionUsage)
+			userSubscriptionsRoute.GET("/:id/history", controller.GetUserSubscriptionHistory)
+			userSubscriptionsRoute.PUT("/:id/settings", controller.UpdateUserSubscriptionSettings)
+			userSubscriptionsRoute.POST("/:id/cancel", controller.CancelUserSubscription)
+			// 自动兜底开关
+			userSubscriptionsRoute.PUT("/:id/auto-wallet", controller.UpdateSubscriptionAutoWallet)
+			// 批量更新优先级
+			userSubscriptionsRoute.PUT("/priorities", controller.BatchUpdateSubscriptionPriorities)
+			userSubscriptionsRoute.POST("/reorder", controller.ReorderUserSubscriptionPriorities)
+			// 订单相关（兼容规格 /api/user/subscriptions/orders）
+			userSubscriptionsRoute.POST("/orders", controller.CreateOrder)
+			userSubscriptionsRoute.POST("/orders/preview", controller.PreviewOrder)
+			userSubscriptionsRoute.POST("/orders/purchase", controller.PurchaseSubscription)
+			userSubscriptionsRoute.GET("/orders", controller.GetUserOrders)
+			userSubscriptionsRoute.GET("/orders/:id", controller.GetUserOrderDetail)
+			userSubscriptionsRoute.POST("/orders/:id/pay", controller.PayOrder)
+			userSubscriptionsRoute.POST("/orders/:id/cancel", controller.CancelUserOrder)
+			// 第三方支付入口（复用现有支付能力）
+			userSubscriptionsRoute.POST("/orders/:id/pay/epay", controller.SubscriptionOrderEpay)
+			userSubscriptionsRoute.POST("/orders/:id/pay/stripe", controller.SubscriptionOrderStripe)
+		}
+
+		// 旧路由（保持向后兼容）
+		userSubscriptionRoute := apiRouter.Group("/subscription/self")
+		userSubscriptionRoute.Use(middleware.UserAuth())
+		{
+			userSubscriptionRoute.GET("/", controller.GetUserSubscriptions)
+			userSubscriptionRoute.GET("/active", controller.GetUserActiveSubscriptions)
+			userSubscriptionRoute.GET("/:id", controller.GetUserSubscriptionDetail)
+			userSubscriptionRoute.GET("/:id/usage", controller.GetUserSubscriptionUsage)
+			userSubscriptionRoute.GET("/:id/history", controller.GetUserSubscriptionHistory)
+			userSubscriptionRoute.PUT("/:id/settings", controller.UpdateUserSubscriptionSettings)
+			userSubscriptionRoute.POST("/:id/cancel", controller.CancelUserSubscription)
+			userSubscriptionRoute.POST("/reorder", controller.ReorderUserSubscriptionPriorities)
+		}
+
+		// 用户设置路由
+		userSettingsRoute := apiRouter.Group("/user/settings")
+		userSettingsRoute.Use(middleware.UserAuth())
+		{
+			userSettingsRoute.GET("/auto-wallet-fallback", controller.GetUserAutoWalletFallback)
+			userSettingsRoute.PUT("/auto-wallet-fallback", controller.UpdateUserAutoWalletFallback)
+		}
+
+		// 用户优惠券路由
+		userCouponRoute := apiRouter.Group("/user/coupons")
+		userCouponRoute.Use(middleware.UserAuth())
+		{
+			userCouponRoute.POST("/claim", controller.ClaimCoupon)
+			userCouponRoute.GET("/", controller.GetUserCoupons)
+			userCouponRoute.GET("/available", controller.GetAvailableCoupons)
+			userCouponRoute.GET("/:id", controller.GetUserCouponDetail)
+		}
+
+		// 用户支付优惠券预览路由
+		userPaymentRoute := apiRouter.Group("/user/payment")
+		userPaymentRoute.Use(middleware.UserAuth())
+		{
+			userPaymentRoute.POST("/coupon/preview", controller.PreviewCouponUsage)
+		}
+
+		// 用户兑换订阅路由
+		userRedemptionRoute := apiRouter.Group("/user/redemptions")
+		userRedemptionRoute.Use(middleware.UserAuth())
+		{
+			userRedemptionRoute.POST("/use", controller.UseSubscriptionRedemption)
+			userRedemptionRoute.POST("/preview", controller.PreviewSubscriptionRedemption)
+		}
+
+		// 用户订单管理路由
+		userOrderRoute := apiRouter.Group("/subscription-orders")
+		userOrderRoute.Use(middleware.UserAuth())
+		{
+			userOrderRoute.GET("/self", controller.GetUserOrders)
+			userOrderRoute.GET("/self/:id", controller.GetUserOrderDetail)
+			userOrderRoute.POST("/preview", controller.PreviewOrder)
+			userOrderRoute.POST("/", controller.CreateOrder)
+			userOrderRoute.POST("/purchase", controller.PurchaseSubscription) // 一键购买（创建+支付）
+			userOrderRoute.POST("/:id/pay", controller.PayOrder)
+			userOrderRoute.POST("/:id/cancel", controller.CancelUserOrder)
 		}
 	}
 }

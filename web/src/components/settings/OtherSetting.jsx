@@ -470,7 +470,7 @@ const OtherSetting = () => {
                 {t('设置关于')}
               </Button>
               {/*  */}
-              <Banner
+              {/* <Banner
                 fullMode={false}
                 type='info'
                 description={t(
@@ -478,7 +478,7 @@ const OtherSetting = () => {
                 )}
                 closeIcon={null}
                 style={{ marginTop: 15 }}
-              />
+              /> */}
               <Form.Input
                 label={t('页脚')}
                 placeholder={t(

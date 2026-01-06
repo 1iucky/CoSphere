@@ -1,9 +1,61 @@
-.github
+# Git
 .git
-*.md
-.vscode
+.github
 .gitignore
-Makefile
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Documentation
+*.md
 docs
-.eslintcache
+LICENSE
+
+# Build artifacts
 .gocache
+.gomodcache
+.cache
+.eslintcache
+
+# Node modules (前端依赖在容器内安装)
+web/node_modules
+node_modules
+
+# Local development
+.env
+.env.local
+.env.*.local
+docker-compose*.yml
+Makefile
+
+# Test files
+test
+*_test.go
+**/*_test.go
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.log
+*.tmp
+tmp
+temp
+
+# Database and data files
+*.db
+*.sqlite
+data
+database-backups
+
+# Build output (will be built in container)
+web/dist
+new-api
+*.exe
+
+# Spec workflow
+.spec-workflow

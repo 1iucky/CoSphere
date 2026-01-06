@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -244,12 +245,7 @@ func EpayNotify(c *gin.Context) {
 		return
 	}
 	verifyInfo, err := client.Verify(params)
-	if err == nil && verifyInfo.VerifyStatus {
-		_, err := c.Writer.Write([]byte("success"))
-		if err != nil {
-			log.Println("易支付回调写入失败")
-		}
-	} else {
+	if err != nil || !verifyInfo.VerifyStatus {
 		_, err := c.Writer.Write([]byte("fail"))
 		if err != nil {
 			log.Println("易支付回调写入失败")
@@ -258,38 +254,139 @@ func EpayNotify(c *gin.Context) {
 		return
 	}
 
-	if verifyInfo.TradeStatus == epay.StatusTradeSuccess {
-		log.Println(verifyInfo)
-		LockOrder(verifyInfo.ServiceTradeNo)
-		defer UnlockOrder(verifyInfo.ServiceTradeNo)
-		topUp := model.GetTopUpByTradeNo(verifyInfo.ServiceTradeNo)
-		if topUp == nil {
-			log.Printf("易支付回调未找到订单: %v", verifyInfo)
+	if verifyInfo.TradeStatus != epay.StatusTradeSuccess {
+		log.Printf("易支付异常回调: %v", verifyInfo)
+		_, _ = c.Writer.Write([]byte("success"))
+		return
+	}
+
+	log.Println(verifyInfo)
+	LockOrder(verifyInfo.ServiceTradeNo)
+	defer UnlockOrder(verifyInfo.ServiceTradeNo)
+
+	// 根据交易号前缀分流：SUB 开头为订阅订单，否则为充值订单
+	if strings.HasPrefix(verifyInfo.ServiceTradeNo, "SUB") {
+		// 订阅订单支付回调
+		handleSubscriptionEpayNotify(c, verifyInfo)
+	} else {
+		// 充值订单支付回调
+		handleTopUpEpayNotify(c, verifyInfo)
+	}
+}
+
+// handleTopUpEpayNotify 处理充值订单的易支付回调
+func handleTopUpEpayNotify(c *gin.Context, verifyInfo *epay.VerifyRes) {
+	topUp := model.GetTopUpByTradeNo(verifyInfo.ServiceTradeNo)
+	if topUp == nil {
+		log.Printf("易支付回调未找到充值订单: %v", verifyInfo)
+		_, _ = c.Writer.Write([]byte("success"))
+		return
+	}
+	if topUp.Status == "pending" {
+		topUp.Status = "success"
+		err := topUp.Update()
+		if err != nil {
+			log.Printf("易支付回调更新充值订单失败: %v", topUp)
+			_, _ = c.Writer.Write([]byte("fail"))
 			return
 		}
-		if topUp.Status == "pending" {
-			topUp.Status = "success"
-			err := topUp.Update()
-			if err != nil {
-				log.Printf("易支付回调更新订单失败: %v", topUp)
-				return
-			}
-			//user, _ := model.GetUserById(topUp.UserId, false)
-			//user.Quota += topUp.Amount * 500000
-			dAmount := decimal.NewFromInt(int64(topUp.Amount))
-			dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
-			quotaToAdd := int(dAmount.Mul(dQuotaPerUnit).IntPart())
-			err = model.IncreaseUserQuota(topUp.UserId, quotaToAdd, true)
-			if err != nil {
-				log.Printf("易支付回调更新用户失败: %v", topUp)
-				return
-			}
-			log.Printf("易支付回调更新用户成功 %v", topUp)
-			model.RecordLog(topUp.UserId, model.LogTypeTopup, fmt.Sprintf("使用在线充值成功，充值金额: %v，支付金额：%f", logger.LogQuota(quotaToAdd), topUp.Money))
+		dAmount := decimal.NewFromInt(int64(topUp.Amount))
+		dQuotaPerUnit := decimal.NewFromFloat(common.QuotaPerUnit)
+		quotaToAdd := int(dAmount.Mul(dQuotaPerUnit).IntPart())
+		err = model.IncreaseUserQuota(topUp.UserId, quotaToAdd, true)
+		if err != nil {
+			log.Printf("易支付回调更新用户失败: %v", topUp)
+			_, _ = c.Writer.Write([]byte("fail"))
+			return
 		}
-	} else {
-		log.Printf("易支付异常回调: %v", verifyInfo)
+		log.Printf("易支付回调更新用户成功 %v", topUp)
+		model.RecordLog(topUp.UserId, model.LogTypeTopup, fmt.Sprintf("使用在线充值成功，充值金额: %v，支付金额：%f", logger.LogQuota(quotaToAdd), topUp.Money))
 	}
+	_, _ = c.Writer.Write([]byte("success"))
+}
+
+// handleSubscriptionEpayNotify 处理订阅订单的易支付回调
+func handleSubscriptionEpayNotify(c *gin.Context, verifyInfo *epay.VerifyRes) {
+	// 根据交易号查找订阅订单
+	order, err := model.GetSubscriptionOrderByTradeNo(verifyInfo.ServiceTradeNo)
+	if err != nil {
+		log.Printf("易支付回调未找到订阅订单: tradeNo=%s, err=%v", verifyInfo.ServiceTradeNo, err)
+		_, _ = c.Writer.Write([]byte("success"))
+		return
+	}
+
+	// 幂等性检查：订单已支付，直接返回成功
+	if order.Status == common.OrderStatusPaid {
+		log.Printf("订阅订单已支付，跳过处理: orderId=%d, tradeNo=%s", order.Id, verifyInfo.ServiceTradeNo)
+		_, _ = c.Writer.Write([]byte("success"))
+		return
+	}
+
+	// 验证订单状态
+	if order.Status != common.OrderStatusPending {
+		log.Printf("订阅订单状态不正确: orderId=%d, status=%s", order.Id, order.Status)
+		_, _ = c.Writer.Write([]byte("success"))
+		return
+	}
+
+	// 校验支付金额（分转元后比较）
+	expectedMoney := float64(order.FinalPriceCents) / 100.0
+	actualMoney, parseErr := strconv.ParseFloat(verifyInfo.Money, 64)
+	if parseErr != nil {
+		log.Printf("易支付订阅回调金额解析失败: orderId=%d, rawMoney=%s, err=%v, tradeNo=%s",
+			order.Id, verifyInfo.Money, parseErr, verifyInfo.ServiceTradeNo)
+		_, _ = c.Writer.Write([]byte("fail"))
+		return
+	}
+	// 允许 0.01 元的误差（浮点数精度问题）
+	if actualMoney < expectedMoney-0.01 {
+		log.Printf("易支付订阅回调金额不足: orderId=%d, expected=%.2f, actual=%.2f, tradeNo=%s",
+			order.Id, expectedMoney, actualMoney, verifyInfo.ServiceTradeNo)
+		_, _ = c.Writer.Write([]byte("fail"))
+		return
+	}
+
+	// 校验支付渠道（将易支付返回的渠道映射为规范值后比较）
+	// verifyInfo.Type 是易支付返回的原始渠道（wxpay, alipay 等）
+	actualChannel := verifyInfo.Type
+	if actualChannel == "wxpay" {
+		actualChannel = common.PaymentChannelWechat
+	} else if actualChannel == "alipay" {
+		actualChannel = common.PaymentChannelAlipay
+	} else {
+		// 其他渠道（如 custom1）默认映射为 alipay
+		actualChannel = common.PaymentChannelAlipay
+	}
+
+	// 渠道不一致时，先更新订单渠道为真实渠道再入账
+	// （用户可能在支付页面切换了支付方式，ProcessPaymentInternal 要求渠道一致）
+	if actualChannel != order.PaymentChannel {
+		log.Printf("易支付订阅回调渠道不匹配，更新订单渠道: orderId=%d, orderChannel=%s -> actualChannel=%s (raw: %s), tradeNo=%s",
+			order.Id, order.PaymentChannel, actualChannel, verifyInfo.Type, verifyInfo.ServiceTradeNo)
+		order.PaymentChannel = actualChannel
+		if err := model.UpdateSubscriptionOrder(order); err != nil {
+			log.Printf("易支付订阅回调更新订单渠道失败: orderId=%d, err=%v", order.Id, err)
+			_, _ = c.Writer.Write([]byte("fail"))
+			return
+		}
+	}
+
+	// 调用订阅订单服务完成支付处理
+	svc := service.GetSubscriptionOrderService()
+	result, err := svc.ProcessPaymentInternal(order.UserId, order.Id, order.PaymentChannel, verifyInfo.ServiceTradeNo)
+	if err != nil {
+		log.Printf("订阅订单支付处理失败: orderId=%d, err=%v", order.Id, err)
+		_, _ = c.Writer.Write([]byte("fail"))
+		return
+	}
+
+	if result.Success {
+		log.Printf("订阅订单支付成功: orderId=%d, userId=%d, tradeNo=%s, amount=%.2f, channel=%s",
+			order.Id, order.UserId, verifyInfo.ServiceTradeNo, actualMoney, order.PaymentChannel)
+	} else {
+		log.Printf("订阅订单支付失败: orderId=%d, errMsg=%s", order.Id, result.ErrorMessage)
+	}
+	_, _ = c.Writer.Write([]byte("success"))
 }
 
 func RequestAmount(c *gin.Context) {

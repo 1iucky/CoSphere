@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/system_setting"
@@ -166,15 +168,95 @@ func sessionCompleted(event stripe.Event) {
 		return
 	}
 
-	err := model.Recharge(referenceId, customerId)
+	// 获取支付金额用于验证
+	amountTotal, _ := strconv.ParseInt(event.GetObjectValue("amount_total"), 10, 64)
+	currency := strings.ToUpper(event.GetObjectValue("currency"))
+
+	// 尝试查找订阅订单（通过 trade_no）
+	subOrder, err := model.GetSubscriptionOrderByTradeNo(referenceId)
+	if err == nil && subOrder != nil {
+		// 这是订阅订单支付回调
+		handleSubscriptionStripeCompleted(subOrder, referenceId, amountTotal, currency)
+		return
+	}
+
+	// 充值订单处理（原有逻辑）
+	err = model.Recharge(referenceId, customerId)
 	if err != nil {
 		log.Println(err.Error(), referenceId)
 		return
 	}
 
-	total, _ := strconv.ParseFloat(event.GetObjectValue("amount_total"), 64)
-	currency := strings.ToUpper(event.GetObjectValue("currency"))
-	log.Printf("收到款项：%s, %.2f(%s)", referenceId, total/100, currency)
+	log.Printf("收到款项：%s, %.2f(%s)", referenceId, float64(amountTotal)/100, currency)
+}
+
+// handleSubscriptionStripeCompleted 处理订阅订单的 Stripe 支付完成回调
+func handleSubscriptionStripeCompleted(order *model.SubscriptionOrder, referenceId string, amountTotal int64, currency string) {
+	// 幂等性检查：订单已支付，直接返回
+	if order.Status == common.OrderStatusPaid {
+		log.Printf("Stripe 订阅订单已支付，跳过处理: orderId=%d, tradeNo=%s", order.Id, referenceId)
+		return
+	}
+
+	// 验证订单状态
+	if order.Status != common.OrderStatusPending {
+		log.Printf("Stripe 订阅订单状态不正确: orderId=%d, status=%s", order.Id, order.Status)
+		return
+	}
+
+	// 验证币种
+	planSnapshot, _ := order.GetPlanSnapshotData()
+	if planSnapshot != nil && strings.ToUpper(planSnapshot.Currency) != currency {
+		log.Printf("Stripe 订阅订单币种不匹配，拒绝处理: orderId=%d, expected=%s, actual=%s",
+			order.Id, planSnapshot.Currency, currency)
+		return
+	}
+
+	// 验证金额（Stripe 返回的 amount_total 是最小货币单位，即分/cents）
+	// 订阅订单禁用 Promotion Codes，但 Stripe 可能添加自动税/手续费
+	// 因此只拒绝支付不足的情况，允许支付金额 >= 订单金额（税费只增不减）
+	if amountTotal < order.FinalPriceCents {
+		log.Printf("Stripe 订阅订单金额不足，拒绝处理: orderId=%d, expected=%d cents, actual=%d cents, tradeNo=%s",
+			order.Id, order.FinalPriceCents, amountTotal, referenceId)
+		return
+	}
+
+	// 金额含税费时，记录实际支付金额到 Metadata 以保证账实一致
+	if amountTotal > order.FinalPriceCents {
+		log.Printf("Stripe 订阅订单金额含税费: orderId=%d, expected=%d cents, actual=%d cents (差额=%d cents), tradeNo=%s",
+			order.Id, order.FinalPriceCents, amountTotal, amountTotal-order.FinalPriceCents, referenceId)
+
+		// 更新订单 Metadata 记录实际支付金额
+		metadata := make(map[string]interface{})
+		if order.Metadata != nil && *order.Metadata != "" {
+			_ = json.Unmarshal([]byte(*order.Metadata), &metadata)
+		}
+		metadata["actual_paid_cents"] = amountTotal
+		metadata["tax_fee_cents"] = amountTotal - order.FinalPriceCents
+		metadata["currency"] = currency
+		metadataBytes, _ := json.Marshal(metadata)
+		metadataStr := string(metadataBytes)
+		order.Metadata = &metadataStr
+		if err := model.UpdateSubscriptionOrder(order); err != nil {
+			log.Printf("Stripe 订阅订单更新 Metadata 失败: orderId=%d, err=%v", order.Id, err)
+			// 继续处理，不阻止入账
+		}
+	}
+
+	// 调用订阅订单服务完成支付处理
+	svc := service.GetSubscriptionOrderService()
+	result, err := svc.ProcessPaymentInternal(order.UserId, order.Id, common.PaymentChannelStripe, referenceId)
+	if err != nil {
+		log.Printf("Stripe 订阅订单支付处理失败: orderId=%d, err=%v", order.Id, err)
+		return
+	}
+
+	if result.Success {
+		log.Printf("Stripe 订阅订单支付成功: orderId=%d, userId=%d, tradeNo=%s, amount=%.2f %s",
+			order.Id, order.UserId, referenceId, float64(amountTotal)/100, currency)
+	} else {
+		log.Printf("Stripe 订阅订单支付失败: orderId=%d, errMsg=%s", order.Id, result.ErrorMessage)
+	}
 }
 
 func sessionExpired(event stripe.Event) {
@@ -236,6 +318,56 @@ func genStripeLink(referenceId string, customerId string, email string, amount i
 			params.CustomerEmail = stripe.String(email)
 		}
 
+		params.CustomerCreation = stripe.String(string(stripe.CheckoutSessionCustomerCreationAlways))
+	} else {
+		params.Customer = stripe.String(customerId)
+	}
+
+	result, err := session.New(params)
+	if err != nil {
+		return "", err
+	}
+
+	return result.URL, nil
+}
+
+// genStripeSubscriptionLink 生成订阅订单的 Stripe Checkout 链接
+// 使用动态价格（PriceData.UnitAmount）而非 PriceId * Quantity
+// amountCents 是订单金额（美分），直接作为 UnitAmount
+// 注意：订阅订单禁用 Promotion Codes，确保金额与订单完全匹配
+func genStripeSubscriptionLink(referenceId string, customerId string, email string, amountCents int64, productName string) (string, error) {
+	if !strings.HasPrefix(setting.StripeApiSecret, "sk_") && !strings.HasPrefix(setting.StripeApiSecret, "rk_") {
+		return "", fmt.Errorf("无效的Stripe API密钥")
+	}
+
+	stripe.Key = setting.StripeApiSecret
+
+	// 使用动态价格，避免 PriceId * Quantity 的金额倍增问题
+	// 订阅订单禁用 Promotion Codes，防止用户使用优惠后金额不匹配
+	params := &stripe.CheckoutSessionParams{
+		ClientReferenceID: stripe.String(referenceId),
+		SuccessURL:        stripe.String(system_setting.ServerAddress + "/console/subscription"),
+		CancelURL:         stripe.String(system_setting.ServerAddress + "/console/subscription"),
+		LineItems: []*stripe.CheckoutSessionLineItemParams{
+			{
+				PriceData: &stripe.CheckoutSessionLineItemPriceDataParams{
+					Currency:   stripe.String("usd"),
+					UnitAmount: stripe.Int64(amountCents), // 金额已是美分，直接使用
+					ProductData: &stripe.CheckoutSessionLineItemPriceDataProductDataParams{
+						Name: stripe.String(productName),
+					},
+				},
+				Quantity: stripe.Int64(1),
+			},
+		},
+		Mode:                stripe.String(string(stripe.CheckoutSessionModePayment)),
+		AllowPromotionCodes: stripe.Bool(false), // 订阅订单禁用优惠码，确保金额一致
+	}
+
+	if "" == customerId {
+		if "" != email {
+			params.CustomerEmail = stripe.String(email)
+		}
 		params.CustomerCreation = stripe.String(string(stripe.CheckoutSessionCustomerCreationAlways))
 	} else {
 		params.Customer = stripe.String(customerId)

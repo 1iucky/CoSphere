@@ -454,6 +454,7 @@ func GetSelf(c *gin.Context) {
 		"email":             user.Email,
 		"github_id":         user.GitHubId,
 		"discord_id":        user.DiscordId,
+		"google_id":         user.GoogleId,
 		"oidc_id":           user.OidcId,
 		"wechat_id":         user.WeChatId,
 		"telegram_id":       user.TelegramId,

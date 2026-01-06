@@ -502,14 +502,39 @@ func PreConsumeTokenQuota(relayInfo *relaycommon.RelayInfo, quota int) error {
 }
 
 func PostConsumeQuota(relayInfo *relaycommon.RelayInfo, quota int, preConsumedQuota int, sendEmail bool) (err error) {
-
-	if quota > 0 {
-		err = model.DecreaseUserQuota(relayInfo.UserId, quota)
-	} else {
-		err = model.IncreaseUserQuota(relayInfo.UserId, -quota, false)
+	if relayInfo == nil {
+		return errors.New("relayInfo is nil")
 	}
-	if err != nil {
-		return err
+
+	isSubscriptionBilling := relayInfo.BillingSource == BillingSourceSubscription
+	if isSubscriptionBilling && relayInfo.SubscriptionContextId != "" {
+		subscriptionPreConsumed := relayInfo.SubscriptionPreConsumedQuota
+		if subscriptionPreConsumed > 0 {
+			actualAmount := int64(quota + preConsumedQuota)
+			if actualAmount < 0 {
+				return fmt.Errorf("invalid actual amount for subscription billing: %d", actualAmount)
+			}
+			ctx := &BillingContext{
+				Source: BillingSourceSubscription,
+				PreConsumeContext: &PreConsumeContext{
+					ContextId: relayInfo.SubscriptionContextId,
+				},
+			}
+			if err := GetSubscriptionBillingService().PostBilling(ctx, subscriptionPreConsumed, actualAmount, relayInfo); err != nil {
+				return err
+			}
+		}
+	}
+
+	if !isSubscriptionBilling {
+		if quota > 0 {
+			err = model.DecreaseUserQuota(relayInfo.UserId, quota)
+		} else {
+			err = model.IncreaseUserQuota(relayInfo.UserId, -quota, false)
+		}
+		if err != nil {
+			return err
+		}
 	}
 
 	if !relayInfo.IsPlayground {
@@ -523,7 +548,7 @@ func PostConsumeQuota(relayInfo *relaycommon.RelayInfo, quota int, preConsumedQu
 		}
 	}
 
-	if sendEmail {
+	if sendEmail && !isSubscriptionBilling {
 		if (quota + preConsumedQuota) != 0 {
 			checkAndSendQuotaNotify(relayInfo, quota, preConsumedQuota)
 		}

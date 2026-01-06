@@ -365,8 +365,9 @@ func TestEdgeCases(t *testing.T) {
 
 	t.Run("大量优先级", func(t *testing.T) {
 		token := &model.Token{}
-		priorities := make([]model.GroupPriority, 100)
-		for i := 0; i < 100; i++ {
+		count := model.MaxGroupPriorities
+		priorities := make([]model.GroupPriority, count)
+		for i := 0; i < count; i++ {
 			priorities[i] = model.GroupPriority{
 				Group:    string(rune('A' + i)),
 				Priority: i + 1,
@@ -383,8 +384,8 @@ func TestEdgeCases(t *testing.T) {
 			t.Fatalf("获取优先级失败: %v", err)
 		}
 
-		if len(retrieved) != 100 {
-			t.Errorf("期望 100 个优先级, 得到 %d", len(retrieved))
+		if len(retrieved) != count {
+			t.Errorf("期望 %d 个优先级, 得到 %d", count, len(retrieved))
 		}
 	})
 }
@@ -429,7 +430,7 @@ func TestSelectChannelWithPriority_ChoosesHighestPriority(t *testing.T) {
 	}
 }
 
-func TestSelectChannelWithPriority_AutoSmartFallback(t *testing.T) {
+func TestSelectChannelWithPriority_AutoSmartGroupFallback(t *testing.T) {
 	defer func(original func(string, string, int) (*model.Channel, error)) {
 		randomChannelSelector = original
 	}(randomChannelSelector)

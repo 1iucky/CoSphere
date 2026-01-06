@@ -45,6 +45,7 @@ import {
 import { IconGift } from '@douyinfe/semi-icons';
 import { useMinimumLoadingTime } from '../../hooks/common/useMinimumLoadingTime';
 import { getCurrencyConfig } from '../../helpers/render';
+import { getAssetUrl } from '../../helpers/utils';
 
 const { Text } = Typography;
 
@@ -121,7 +122,7 @@ const RechargeCard = ({
               className='relative h-30'
               style={{
                 '--palette-primary-darkerChannel': '37 99 235',
-                backgroundImage: `linear-gradient(0deg, rgba(var(--palette-primary-darkerChannel) / 80%), rgba(var(--palette-primary-darkerChannel) / 80%)), url('/cover-4.webp')`,
+                backgroundImage: `linear-gradient(0deg, rgba(var(--palette-primary-darkerChannel) / 80%), rgba(var(--palette-primary-darkerChannel) / 80%)), url('${getAssetUrl('cover-4.webp')}')`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat',

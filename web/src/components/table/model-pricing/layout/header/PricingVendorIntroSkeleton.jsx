@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 
 import React, { memo } from 'react';
 import { Card, Skeleton } from '@douyinfe/semi-ui';
+import { getAssetUrl } from '../../../../../helpers/utils';
 
 const THEME_COLORS = {
   allVendors: {
@@ -49,7 +50,7 @@ const SIZES = {
 const SKELETON_STYLES = {
   cover: (primaryColor) => ({
     '--palette-primary-darkerChannel': primaryColor,
-    backgroundImage: `linear-gradient(0deg, rgba(var(--palette-primary-darkerChannel) / 80%), rgba(var(--palette-primary-darkerChannel) / 80%)), url('/cover-4.webp')`,
+    backgroundImage: `linear-gradient(0deg, rgba(var(--palette-primary-darkerChannel) / 80%), rgba(var(--palette-primary-darkerChannel) / 80%)), url('${getAssetUrl('cover-4.webp')}')`,
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     backgroundRepeat: 'no-repeat',

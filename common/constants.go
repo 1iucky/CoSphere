@@ -198,7 +198,223 @@ const (
 )
 
 const (
+	ModelStatusDisabled = 0 // 禁用
+	ModelStatusEnabled  = 1 // 启用（默认值）
+)
+
+const (
 	TopUpStatusPending = "pending"
 	TopUpStatusSuccess = "success"
 	TopUpStatusExpired = "expired"
+)
+
+// ============================================================================
+// 订阅系统常量定义
+// ============================================================================
+
+// 订阅状态
+const (
+	SubscriptionStatusPending   = "pending"   // 待激活
+	SubscriptionStatusActive    = "active"    // 激活中
+	SubscriptionStatusExpired   = "expired"   // 已过期
+	SubscriptionStatusCancelled = "cancelled" // 已取消
+)
+
+// 套餐状态
+const (
+	PlanStatusDraft    = "draft"    // 草稿
+	PlanStatusActive   = "active"   // 上架
+	PlanStatusArchived = "archived" // 归档（下架）
+)
+
+// 计费周期类型
+const (
+	BillingCycleMonthly    = "monthly"     // 按月（1个月）
+	BillingCycleYearly     = "yearly"      // 按年（12个月）
+	BillingCycleCustom     = "custom"      // 自定义周期
+	BillingCycleFiveHours  = "five_hours"  // 5小时
+	BillingCycleDay        = "day"         // 按天
+	BillingCycleWeek       = "week"        // 按周
+	BillingCycleMonth      = "month"       // 按月（通用）
+)
+
+// 限额周期类型（滚动窗口）
+const (
+	PeriodFiveHours = "five_hours" // 5小时
+	PeriodDay       = "day"        // 天
+	PeriodWeek      = "week"       // 周
+	PeriodMonth     = "month"      // 月
+
+	// 别名（用于 model 层）
+	LimitPeriodFiveHours = PeriodFiveHours
+	LimitPeriodDay       = PeriodDay
+	LimitPeriodWeek      = PeriodWeek
+	LimitPeriodMonth     = PeriodMonth
+)
+
+// 限额单位
+const (
+	LimitUnitQuota    = "quota"    // 按额度
+	LimitUnitTokens   = "tokens"   // 按 token 数
+	LimitUnitRequests = "requests" // 按请求数
+)
+
+// 窗口策略
+const (
+	WindowStrategyRolling = "rolling" // 滚动窗口（从订阅开始时间起算）
+	WindowStrategyFixed   = "fixed"   // 固定窗口（自然日/周/月边界）
+	WindowStrategyNatural = "fixed"   // 自然窗口（别名，等同于 fixed）
+)
+
+// 兑换选项
+const (
+	RedeemOptionStack   = "stack"   // 叠加（延长时间）
+	RedeemOptionCoexist = "coexist" // 共存（新订阅独立生效）
+	RedeemOptionConvert = "convert" // 转换（余额转额度）
+	RedeemOptionReplace = "replace" // 替换（新订阅替换旧订阅）
+	RedeemOptionExtend  = "extend"  // 延期（延长现有订阅时间）
+)
+
+// 优惠券状态
+const (
+	CouponStatusActive   = "active"   // 激活
+	CouponStatusInactive = "inactive" // 停用
+	CouponStatusExpired  = "expired"  // 已过期
+	CouponStatusReserved = "reserved" // 已预留（绑定但未使用，可解绑）
+	CouponStatusUsed     = "used"     // 已使用（不可解绑，不可再次使用）
+)
+
+// 优惠券作用域
+const (
+	CouponScopeQuota              = "quota"        // 额度券
+	CouponScopePlan               = "plan"         // 套餐券
+	CouponScopeSubscription       = "subscription" // 订阅券
+	CouponScopeWallet             = "wallet"        // 余额充值
+	CouponScopeWalletSubscription = "wallet_subscription" // 充值+订阅均可
+)
+
+// 优惠券类型
+const (
+	CouponTypeDiscount         = "discount"          // 折扣券（百分比）
+	CouponTypeFullReduction    = "full_reduction"    // 满减券
+	CouponTypeInstantReduction = "instant_reduction" // 立减券
+)
+
+// 优惠券绑定状态
+const (
+	CouponBindingStatusReserved = "reserved" // 预留状态（已绑定但未使用，可解绑）
+	CouponBindingStatusLocked   = "locked"   // 已锁定（已兑换使用，不可解绑）
+)
+
+// 用户优惠券状态
+const (
+	UserCouponStatusAvailable = "available" // 可用
+	UserCouponStatusLocked    = "locked"    // 已锁定
+	UserCouponStatusUsed      = "used"      // 已使用
+	UserCouponStatusExpired   = "expired"   // 已过期
+	UserCouponStatusInvalid   = "invalid"   // 已作废
+)
+
+// 优惠券折扣类型
+const (
+	DiscountTypePercentage = "percentage" // 百分比折扣（如 20 表示 8折）
+	DiscountTypeFixed      = "fixed"      // 固定金额折扣（单位：分）
+)
+
+// 订单状态
+const (
+	OrderStatusPending   = "pending"   // 待支付
+	OrderStatusPaid      = "paid"      // 已支付
+	OrderStatusCancelled = "cancelled" // 已取消
+	OrderStatusExpired   = "expired"   // 已过期
+	OrderStatusFailed    = "failed"    // 支付失败
+	OrderStatusRefunded  = "refunded"  // 已退款
+)
+
+// 支付渠道
+const (
+	PaymentChannelWallet     = "wallet"     // 余额支付
+	PaymentChannelStripe     = "stripe"     // Stripe
+	PaymentChannelAlipay     = "alipay"     // 支付宝
+	PaymentChannelWechat     = "wechat"     // 微信支付
+	PaymentChannelPaypal     = "paypal"     // PayPal
+	PaymentChannelRedemption = "redemption" // 兑换码支付
+	PaymentChannelFree       = "free"       // 免费（0元订单）
+)
+
+// 账单状态
+const (
+	BillStatusPending   = "pending"   // 待支付
+	BillStatusPaid      = "paid"      // 已支付
+	BillStatusOverdue   = "overdue"   // 逾期
+	BillStatusCancelled = "cancelled" // 已取消
+)
+
+// 账单类型
+const (
+	BillTypeSubscription      = "subscription"       // 订阅购买
+	BillTypeSubscriptionRenew = "subscription_renew" // 订阅续费
+	BillTypeRefund            = "refund"             // 退款
+	BillTypeRecharge          = "recharge"           // 充值
+	BillTypeConsume           = "consume"            // 消费
+	BillTypeAdjustment        = "adjustment"         // 调整
+	BillTypeCouponDiscount    = "coupon_discount"    // 优惠券折扣
+)
+
+// 账单来源类型
+const (
+	BillSourceTypeSubscriptionOrder = "subscription_order" // 订阅订单
+	BillSourceTypeRedemption        = "redemption"         // 兑换码
+	BillSourceTypeCoupon            = "coupon"             // 优惠券
+	BillSourceTypeCouponUsage       = "coupon_usage"       // 优惠券核销
+	BillSourceTypeAdmin             = "admin"              // 管理员操作
+	BillSourceTypeSystem            = "system"             // 系统操作
+)
+
+// 兑换类型（扩展 redemptions.type 字段）
+const (
+	RedemptionTypeQuota        = "quota"        // 额度兑换（原有逻辑）
+	RedemptionTypeSubscription = "subscription" // 订阅兑换（新增）
+)
+
+// 货币单位
+const (
+	CurrencyUSD = "USD" // 美元
+	CurrencyCNY = "CNY" // 人民币
+	CurrencyEUR = "EUR" // 欧元
+)
+
+// 订阅系统配置项默认值（将在 2.1.4 中使用）
+const (
+	DefaultSubscriptionAutoWalletFallback = false   // 默认不自动兜底
+	DefaultSubscriptionExpiryNoticeDays   = 7       // 默认到期前7天提醒
+	DefaultSubscriptionMaxPerUser         = 10      // 默认每用户最多10个订阅
+	DefaultSubscriptionQuotaLowThreshold  = 0.2     // 默认额度低于20%提醒
+	DefaultSubscriptionV2Enabled          = false   // 默认订阅系统关闭
+)
+
+// Token 订阅偏好设置（对应 tokens.subscription_preferred 字段）
+// 语义：当用户持有令牌且有有效订阅时，是否优先使用订阅额度进行扣费
+// 注意：DDL 中 tokens.subscription_preferred 默认值为 FALSE（即默认不优先使用订阅）
+const (
+	TokenSubscriptionPreferredEnabled  = true  // 启用订阅优先扣费
+	TokenSubscriptionPreferredDisabled = false // 不优先使用订阅，仅使用钱包余额（默认）
+)
+
+// 订阅系统配置键（options 表键名）
+const (
+	OptionKeySubscriptionAutoWalletDefault  = "SUBSCRIPTION_AUTO_WALLET_DEFAULT"  // 自动兜底默认值
+	OptionKeySubscriptionExpiryNoticeDays   = "SUBSCRIPTION_EXPIRY_NOTICE_DAYS"   // 到期提醒天数
+	OptionKeySubscriptionMaxPerUser         = "SUBSCRIPTION_MAX_PER_USER"         // 每用户最大订阅数
+	OptionKeySubscriptionQuotaLowThreshold  = "SUBSCRIPTION_QUOTA_LOW_THRESHOLD"  // 额度低阈值
+	OptionKeySubscriptionV2Enabled          = "SUBSCRIPTION_V2_ENABLED"           // 订阅系统启用开关
+)
+
+// 订阅优先级（数字越小优先级越高）
+const (
+	SubscriptionPriorityHighest = 1  // 最高优先级
+	SubscriptionPriorityHigh    = 10
+	SubscriptionPriorityNormal  = 50
+	SubscriptionPriorityLow     = 90
+	SubscriptionPriorityLowest  = 99 // 最低优先级
 )

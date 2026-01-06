@@ -21,3 +21,6 @@ web/bun.lock
 
 electron/node_modules
 electron/dist
+.gomodcache
+.gotmp
+pprofdatabase-backups/

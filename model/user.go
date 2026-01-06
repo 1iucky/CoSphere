@@ -13,40 +13,43 @@ import (
 
 	"github.com/bytedance/gopkg/util/gopool"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // User if you add sensitive fields, don't forget to clean them in setupLogin function.
 // Otherwise, the sensitive information will be saved on local storage in plain text!
 type User struct {
-	Id               int            `json:"id"`
-	Username         string         `json:"username" gorm:"unique;index" validate:"max=20"`
-	Password         string         `json:"password" gorm:"not null;" validate:"min=8,max=20"`
-	OriginalPassword string         `json:"original_password" gorm:"-:all"` // this field is only for Password change verification, don't save it to database!
-	DisplayName      string         `json:"display_name" gorm:"index" validate:"max=20"`
-	Role             int            `json:"role" gorm:"type:int;default:1"`   // admin, common
-	Status           int            `json:"status" gorm:"type:int;default:1"` // enabled, disabled
-	Email            string         `json:"email" gorm:"index" validate:"max=50"`
-	GitHubId         string         `json:"github_id" gorm:"column:github_id;index"`
-	DiscordId        string         `json:"discord_id" gorm:"column:discord_id;index"`
-	OidcId           string         `json:"oidc_id" gorm:"column:oidc_id;index"`
-	WeChatId         string         `json:"wechat_id" gorm:"column:wechat_id;index"`
-	TelegramId       string         `json:"telegram_id" gorm:"column:telegram_id;index"`
-	VerificationCode string         `json:"verification_code" gorm:"-:all"`                                    // this field is only for Email verification, don't save it to database!
-	AccessToken      *string        `json:"access_token" gorm:"type:char(32);column:access_token;uniqueIndex"` // this token is for system management
-	Quota            int            `json:"quota" gorm:"type:int;default:0"`
-	UsedQuota        int            `json:"used_quota" gorm:"type:int;default:0;column:used_quota"` // used quota
-	RequestCount     int            `json:"request_count" gorm:"type:int;default:0;"`               // request number
-	Group            string         `json:"group" gorm:"type:varchar(64);default:'default'"`
-	AffCode          string         `json:"aff_code" gorm:"type:varchar(32);column:aff_code;uniqueIndex"`
-	AffCount         int            `json:"aff_count" gorm:"type:int;default:0;column:aff_count"`
-	AffQuota         int            `json:"aff_quota" gorm:"type:int;default:0;column:aff_quota"`           // 邀请剩余额度
-	AffHistoryQuota  int            `json:"aff_history_quota" gorm:"type:int;default:0;column:aff_history"` // 邀请历史额度
-	InviterId        int            `json:"inviter_id" gorm:"type:int;column:inviter_id;index"`
-	DeletedAt        gorm.DeletedAt `gorm:"index"`
-	LinuxDOId        string         `json:"linux_do_id" gorm:"column:linux_do_id;index"`
-	Setting          string         `json:"setting" gorm:"type:text;column:setting"`
-	Remark           string         `json:"remark,omitempty" gorm:"type:varchar(255)" validate:"max=255"`
-	StripeCustomer   string         `json:"stripe_customer" gorm:"type:varchar(64);column:stripe_customer;index"`
+	Id                 int            `json:"id"`
+	Username           string         `json:"username" gorm:"unique;index" validate:"max=20"`
+	Password           string         `json:"password" gorm:"not null;" validate:"min=8,max=20"`
+	OriginalPassword   string         `json:"original_password" gorm:"-:all"` // this field is only for Password change verification, don't save it to database!
+	DisplayName        string         `json:"display_name" gorm:"index" validate:"max=20"`
+	Role               int            `json:"role" gorm:"type:int;default:1"`   // admin, common
+	Status             int            `json:"status" gorm:"type:int;default:1"` // enabled, disabled
+	Email              string         `json:"email" gorm:"index" validate:"max=50"`
+	GitHubId           string         `json:"github_id" gorm:"column:github_id;index"`
+	DiscordId          string         `json:"discord_id" gorm:"column:discord_id;index"`
+	GoogleId           string         `json:"google_id" gorm:"column:google_id;index"`
+	OidcId             string         `json:"oidc_id" gorm:"column:oidc_id;index"`
+	WeChatId           string         `json:"wechat_id" gorm:"column:wechat_id;index"`
+	TelegramId         string         `json:"telegram_id" gorm:"column:telegram_id;index"`
+	VerificationCode   string         `json:"verification_code" gorm:"-:all"`                                    // this field is only for Email verification, don't save it to database!
+	AccessToken        *string        `json:"access_token" gorm:"type:char(32);column:access_token;uniqueIndex"` // this token is for system management
+	Quota              int            `json:"quota" gorm:"type:int;default:0"`
+	UsedQuota          int            `json:"used_quota" gorm:"type:int;default:0;column:used_quota"` // used quota
+	RequestCount       int            `json:"request_count" gorm:"type:int;default:0;"`               // request number
+	Group              string         `json:"group" gorm:"type:varchar(64);default:'default'"`
+	AffCode            string         `json:"aff_code" gorm:"type:varchar(32);column:aff_code;uniqueIndex"`
+	AffCount           int            `json:"aff_count" gorm:"type:int;default:0;column:aff_count"`
+	AffQuota           int            `json:"aff_quota" gorm:"type:int;default:0;column:aff_quota"`           // 邀请剩余额度
+	AffHistoryQuota    int            `json:"aff_history_quota" gorm:"type:int;default:0;column:aff_history"` // 邀请历史额度
+	InviterId          int            `json:"inviter_id" gorm:"type:int;column:inviter_id;index"`
+	DeletedAt          gorm.DeletedAt `gorm:"index"`
+	LinuxDOId          string         `json:"linux_do_id" gorm:"column:linux_do_id;index"`
+	Setting            string         `json:"setting" gorm:"type:text;column:setting"`
+	Remark             string         `json:"remark,omitempty" gorm:"type:varchar(255)" validate:"max=255"`
+	StripeCustomer     string         `json:"stripe_customer" gorm:"type:varchar(64);column:stripe_customer;index"`
+	AutoWalletFallback bool           `json:"auto_wallet_fallback" gorm:"default:false;column:auto_wallet_fallback"` // 订阅额度耗尽时是否自动使用钱包余额
 }
 
 func (user *User) ToBaseUser() *UserBase {
@@ -300,6 +303,25 @@ func GetUserById(id int, selectAll bool) (*User, error) {
 	return &user, err
 }
 
+func GetUserByIdWithTx(tx *gorm.DB, id int, selectAll bool) (*User, error) {
+	if id == 0 {
+		return nil, errors.New("id 为空！")
+	}
+	if tx == nil {
+		tx = DB
+	}
+
+	user := User{Id: id}
+	var err error
+	if selectAll {
+		err = tx.First(&user, "id = ?", id).Error
+	} else {
+		err = tx.Omit("password").First(&user, "id = ?", id).Error
+	}
+
+	return &user, err
+}
+
 func GetUserIdByAffCode(affCode string) (int, error) {
 	if affCode == "" {
 		return 0, errors.New("affCode 为空！")
@@ -395,6 +417,15 @@ func (user *User) Insert(inviterId int) error {
 	result := DB.Create(user)
 	if result.Error != nil {
 		return result.Error
+	}
+
+	// 用户创建成功后，初始化自动兜底配置（任务 2.2.7 要求）
+	// 此时 user.Id 已经由数据库生成，可以调用初始化方法
+	systemDefault := common.GetAutoWalletFallbackDefault()
+	err = InitializeAutoWalletFallbackForUser(user.Id, systemDefault)
+	if err != nil {
+		// 初始化失败不应阻止用户创建，仅记录日志
+		common.SysLog(fmt.Sprintf("初始化用户 %d 自动兜底配置失败: %s", user.Id, err.Error()))
 	}
 
 	// 用户创建成功后，根据角色初始化边栏配置
@@ -548,6 +579,14 @@ func (user *User) FillUserByDiscordId() error {
 	return nil
 }
 
+func (user *User) FillUserByGoogleId() error {
+	if user.GoogleId == "" {
+		return errors.New("google id 为空！")
+	}
+	DB.Where(User{GoogleId: user.GoogleId}).First(user)
+	return nil
+}
+
 func (user *User) FillUserByOidcId() error {
 	if user.OidcId == "" {
 		return errors.New("oidc id 为空！")
@@ -589,6 +628,10 @@ func IsGitHubIdAlreadyTaken(githubId string) bool {
 
 func IsDiscordIdAlreadyTaken(discordId string) bool {
 	return DB.Unscoped().Where("discord_id = ?", discordId).Find(&User{}).RowsAffected == 1
+}
+
+func IsGoogleIdAlreadyTaken(googleId string) bool {
+	return DB.Unscoped().Where("google_id = ?", googleId).Find(&User{}).RowsAffected == 1
 }
 
 func IsOidcIdAlreadyTaken(oidcId string) bool {
@@ -928,4 +971,278 @@ func RootUserExists() bool {
 		return false
 	}
 	return true
+}
+
+// ===================== 订阅相关辅助方法 =====================
+
+// GetEffectiveAutoWalletFallback 获取用户有效的钱包自动回退设置
+// 实现"用户设置 > 系统默认"的继承逻辑
+// 从 Setting JSON 中读取 auto_wallet_fallback_explicit 标记判断用户是否显式设置
+// 返回值：(是否自动回退, 是否使用的系统默认值)
+func (user *User) GetEffectiveAutoWalletFallback(systemDefault bool) (bool, bool) {
+	// 解析 Setting JSON
+	var settings dto.UserSetting
+	if user.Setting != "" {
+		err := json.Unmarshal([]byte(user.Setting), &settings)
+		if err == nil && settings.AutoWalletFallbackExplicit != nil {
+			// 用户已显式设置过，使用用户设置
+			return user.AutoWalletFallback, false
+		}
+	}
+
+	// 用户未显式设置，使用系统默认值
+	return systemDefault, true
+}
+
+// UpdateAutoWalletFallback 更新用户的钱包自动回退设置
+// 同时在 Setting JSON 中标记用户已显式设置
+func UpdateAutoWalletFallback(userId int, autoFallback bool) error {
+	// 获取用户
+	var user User
+	err := DB.First(&user, "id = ?", userId).Error
+	if err != nil {
+		return err
+	}
+
+	// 解析现有设置
+	var settings dto.UserSetting
+	if user.Setting != "" {
+		json.Unmarshal([]byte(user.Setting), &settings)
+	}
+
+	// 标记为已显式设置
+	explicit := true
+	settings.AutoWalletFallbackExplicit = &explicit
+	settings.AutoWalletFallback = autoFallback
+
+	// 序列化回 JSON
+	settingData, err := json.Marshal(settings)
+	if err != nil {
+		return err
+	}
+	settingStr := string(settingData)
+
+	// 更新数据库
+	err = DB.Model(&User{}).Where("id = ?", userId).
+		Updates(map[string]interface{}{
+			"auto_wallet_fallback": autoFallback,
+			"setting":              settingStr,
+		}).Error
+	if err != nil {
+		return err
+	}
+
+	// 刷新用户设置缓存
+	_ = updateUserSettingCache(userId, settingStr)
+
+	return nil
+}
+
+// UpdateAutoWalletFallbackWithTx 在事务中更新用户的钱包自动回退设置
+// 同时在 Setting JSON 中标记用户已显式设置
+//
+// 返回值:
+//   - onCommit: 事务提交后需要调用的回调函数，用于刷新 Redis 缓存。
+//     调用方必须在事务成功提交后调用此函数，忽略其返回的错误（缓存刷新失败不影响业务）。
+//     示例:
+//     onCommit, err := UpdateAutoWalletFallbackWithTx(tx, userId, true)
+//     if err != nil { return err }
+//     if err := tx.Commit().Error; err != nil { return err }
+//     onCommit() // 事务提交后刷新缓存
+//   - err: 数据库操作错误
+func UpdateAutoWalletFallbackWithTx(tx *gorm.DB, userId int, autoFallback bool) (onCommit func(), err error) {
+	// 获取用户
+	var user User
+	err = tx.First(&user, "id = ?", userId).Error
+	if err != nil {
+		return nil, err
+	}
+
+	// 解析现有设置
+	var settings dto.UserSetting
+	if user.Setting != "" {
+		json.Unmarshal([]byte(user.Setting), &settings)
+	}
+
+	// 标记为已显式设置
+	explicit := true
+	settings.AutoWalletFallbackExplicit = &explicit
+	settings.AutoWalletFallback = autoFallback
+
+	// 序列化回 JSON
+	settingData, err := json.Marshal(settings)
+	if err != nil {
+		return nil, err
+	}
+	settingStr := string(settingData)
+
+	// 更新数据库
+	err = tx.Model(&User{}).Where("id = ?", userId).
+		Updates(map[string]interface{}{
+			"auto_wallet_fallback": autoFallback,
+			"setting":              settingStr,
+		}).Error
+	if err != nil {
+		return nil, err
+	}
+
+	// 返回事务提交后的缓存刷新回调
+	onCommit = func() {
+		_ = updateUserSettingCache(userId, settingStr)
+	}
+	return onCommit, nil
+}
+
+// ResetAutoWalletFallback 重置用户的钱包自动回退设置为继承系统默认
+// 清除 Setting JSON 中的 AutoWalletFallbackExplicit 标记，使用户恢复为继承系统默认值
+func ResetAutoWalletFallback(userId int) error {
+	// 获取用户
+	var user User
+	err := DB.First(&user, "id = ?", userId).Error
+	if err != nil {
+		return err
+	}
+
+	// 获取系统默认值
+	systemDefault := common.GetAutoWalletFallbackDefault()
+
+	// 解析现有设置
+	var settings dto.UserSetting
+	if user.Setting != "" {
+		json.Unmarshal([]byte(user.Setting), &settings)
+	}
+
+	// 清除 explicit 标记（设置为 nil），并将 AutoWalletFallback 设置为系统默认值
+	// 这样即使客户端直接读取 setting JSON，也能获得正确的值
+	settings.AutoWalletFallbackExplicit = nil
+	settings.AutoWalletFallback = systemDefault
+
+	// 序列化回 JSON
+	settingData, err := json.Marshal(settings)
+	if err != nil {
+		return err
+	}
+	settingStr := string(settingData)
+
+	// 更新数据库
+	err = DB.Model(&User{}).Where("id = ?", userId).
+		Updates(map[string]interface{}{
+			"auto_wallet_fallback": systemDefault,
+			"setting":              settingStr,
+		}).Error
+	if err != nil {
+		return err
+	}
+
+	// 刷新用户设置缓存
+	_ = updateUserSettingCache(userId, settingStr)
+
+	return nil
+}
+
+// InitializeAutoWalletFallbackForUser 为单个用户初始化 AutoWalletFallback 默认值
+// 用于新用户创建时或存量用户迁移时的初始化
+// 如果用户已有显式设置（AutoWalletFallbackExplicit != nil），则不做任何修改
+func InitializeAutoWalletFallbackForUser(userId int, systemDefault bool) error {
+	// 获取用户
+	user, err := GetUserById(userId, false)
+	if err != nil {
+		return err
+	}
+
+	// 解析现有 Setting JSON
+	var settings dto.UserSetting
+	if user.Setting != "" {
+		err = json.Unmarshal([]byte(user.Setting), &settings)
+		if err != nil {
+			return err
+		}
+	}
+
+	// 如果用户已有显式设置，不做修改
+	if settings.AutoWalletFallbackExplicit != nil {
+		return nil
+	}
+
+	// 使用系统默认值初始化（不设置 AutoWalletFallbackExplicit，保持 nil 表示未显式设置）
+	return DB.Model(&User{}).
+		Where("id = ?", userId).
+		Update("auto_wallet_fallback", systemDefault).Error
+}
+
+// InitializeAutoWalletFallbackForAllUsers 批量初始化所有存量用户的 AutoWalletFallback 默认值
+// 用于系统迁移，为所有未显式设置的用户设置系统默认值
+// 返回初始化的用户数量
+func InitializeAutoWalletFallbackForAllUsers(systemDefault bool) (int64, error) {
+	// 查询所有用户
+	var users []*User
+	if err := DB.Find(&users).Error; err != nil {
+		return 0, err
+	}
+
+	var initializedCount int64 = 0
+
+	// 遍历用户，逐个初始化
+	for _, user := range users {
+		// 解析 Setting JSON
+		var settings dto.UserSetting
+		if user.Setting != "" {
+			err := json.Unmarshal([]byte(user.Setting), &settings)
+			if err != nil {
+				// 跳过解析失败的用户
+				continue
+			}
+		}
+
+		// 如果用户已有显式设置，跳过
+		if settings.AutoWalletFallbackExplicit != nil {
+			continue
+		}
+
+		// 使用系统默认值初始化
+		err := DB.Model(&User{}).
+			Where("id = ?", user.Id).
+			Update("auto_wallet_fallback", systemDefault).Error
+
+		if err == nil {
+			initializedCount++
+		}
+	}
+
+	return initializedCount, nil
+}
+
+// UpdateUserAutoWalletFallback 更新用户的自动兜底配置
+func UpdateUserAutoWalletFallback(userId int, enabled bool) error {
+	if userId == 0 {
+		return errors.New("用户 ID 不能为空")
+	}
+
+	err := DB.Model(&User{}).
+		Where("id = ?", userId).
+		Update("auto_wallet_fallback", enabled).Error
+
+	return err
+}
+
+// LockUserRowForUpdateWithTx 在事务中锁定用户行
+// 用于并发控制场景，确保对用户相关资源的操作串行化
+// 例如：创建订阅时防止并发超限
+func LockUserRowForUpdateWithTx(tx *gorm.DB, userId int64) error {
+	if userId == 0 {
+		return errors.New("用户 ID 不能为空")
+	}
+
+	var user User
+	err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+		First(&user, "id = ?", userId).Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("用户不存在")
+		}
+		return err
+	}
+
+	return nil
 }

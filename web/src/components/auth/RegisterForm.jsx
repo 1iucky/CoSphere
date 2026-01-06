@@ -43,6 +43,7 @@ import {
 } from '@douyinfe/semi-icons';
 import {
   onGitHubOAuthClicked,
+  onGoogleOAuthClicked,
   onLinuxDOOAuthClicked,
   onOIDCClicked,
 } from '../../helpers';
@@ -52,7 +53,7 @@ import WeChatIcon from '../common/logo/WeChatIcon';
 import TelegramLoginButton from 'react-telegram-login/src';
 import { UserContext } from '../../context/User';
 import { useTranslation } from 'react-i18next';
-import { SiDiscord } from 'react-icons/si';
+import { SiDiscord, SiGoogle } from 'react-icons/si';
 
 const RegisterForm = () => {
   let navigate = useNavigate();
@@ -74,6 +75,7 @@ const RegisterForm = () => {
   const [showEmailRegister, setShowEmailRegister] = useState(false);
   const [wechatLoading, setWechatLoading] = useState(false);
   const [githubLoading, setGithubLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [discordLoading, setDiscordLoading] = useState(false);
   const [oidcLoading, setOidcLoading] = useState(false);
   const [linuxdoLoading, setLinuxdoLoading] = useState(false);
@@ -91,6 +93,7 @@ const RegisterForm = () => {
   const [githubButtonText, setGithubButtonText] = useState('使用 GitHub 继续');
   const [githubButtonDisabled, setGithubButtonDisabled] = useState(false);
   const githubTimeoutRef = useRef(null);
+  const googleTimeoutRef = useRef(null);
 
   const logo = getLogo();
   const systemName = getSystemName();
@@ -138,6 +141,9 @@ const RegisterForm = () => {
     return () => {
       if (githubTimeoutRef.current) {
         clearTimeout(githubTimeoutRef.current);
+      }
+      if (googleTimeoutRef.current) {
+        clearTimeout(googleTimeoutRef.current);
       }
     };
   }, []);
@@ -267,6 +273,32 @@ const RegisterForm = () => {
     }
   };
 
+  const handleGoogleClick = async () => {
+    if (!status.google_client_id) {
+      showInfo(t('Google OAuth 配置缺失，请联系管理员'));
+      return;
+    }
+    setGoogleLoading(true);
+    if (googleTimeoutRef.current) {
+      clearTimeout(googleTimeoutRef.current);
+    }
+    googleTimeoutRef.current = setTimeout(() => {
+      setGoogleLoading(false);
+      showError(t('请求超时，请刷新页面后重新发起 Google 登录'));
+    }, 20000);
+    try {
+      await onGoogleOAuthClicked(status.google_client_id);
+    } catch (error) {
+      showError(t('Google 登录发起失败，请稍后重试'));
+    } finally {
+      if (googleTimeoutRef.current) {
+        clearTimeout(googleTimeoutRef.current);
+        googleTimeoutRef.current = null;
+      }
+      setGoogleLoading(false);
+    }
+  };
+
   const handleDiscordClick = () => {
     setDiscordLoading(true);
     try {
@@ -386,6 +418,23 @@ const RegisterForm = () => {
                     disabled={githubButtonDisabled}
                   >
                     <span className='ml-3'>{githubButtonText}</span>
+                  </Button>
+                )}
+
+                {status.google_oauth && (
+                  <Button
+                    theme='outline'
+                    className='w-full h-12 flex items-center justify-center !rounded-full border border-gray-200 hover:bg-gray-50 transition-colors'
+                    type='tertiary'
+                    icon={
+                      <SiGoogle
+                        style={{ color: '#4285F4', width: '20px', height: '20px' }}
+                      />
+                    }
+                    onClick={handleGoogleClick}
+                    loading={googleLoading}
+                  >
+                    <span className='ml-3'>{t('使用 Google 继续')}</span>
                   </Button>
                 )}
 
@@ -616,6 +665,7 @@ const RegisterForm = () => {
               </Form>
 
               {(status.github_oauth ||
+                status.google_oauth ||
                 status.discord_oauth ||
                 status.oidc_enabled ||
                 status.wechat_login ||
@@ -712,6 +762,7 @@ const RegisterForm = () => {
         {showEmailRegister ||
         !(
           status.github_oauth ||
+          status.google_oauth ||
           status.discord_oauth ||
           status.oidc_enabled ||
           status.wechat_login ||

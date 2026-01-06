@@ -145,6 +145,13 @@ func InitOptionMap() {
 	common.OptionMap["AutomaticDisableKeywords"] = operation_setting.AutomaticDisableKeywordsToString()
 	common.OptionMap["ExposeRatioEnabled"] = strconv.FormatBool(ratio_setting.IsExposeRatioEnabled())
 
+	// 订阅系统配置项
+	common.OptionMap[common.OptionKeySubscriptionAutoWalletDefault] = strconv.FormatBool(common.DefaultSubscriptionAutoWalletFallback)
+	common.OptionMap[common.OptionKeySubscriptionExpiryNoticeDays] = strconv.Itoa(common.DefaultSubscriptionExpiryNoticeDays)
+	common.OptionMap[common.OptionKeySubscriptionMaxPerUser] = strconv.Itoa(common.DefaultSubscriptionMaxPerUser)
+	common.OptionMap[common.OptionKeySubscriptionQuotaLowThreshold] = strconv.FormatFloat(common.DefaultSubscriptionQuotaLowThreshold, 'f', -1, 64)
+	common.OptionMap[common.OptionKeySubscriptionV2Enabled] = strconv.FormatBool(common.DefaultSubscriptionV2Enabled)
+
 	// 自动添加所有注册的模型配置
 	modelConfigs := config.GlobalConfig.ExportAllConfigs()
 	for k, v := range modelConfigs {
@@ -153,6 +160,9 @@ func InitOptionMap() {
 
 	common.OptionMapRWMutex.Unlock()
 	loadOptionsFromDatabase()
+
+	// 初始化订阅系统配置缓存，确保 OptionMap 默认值或数据库值生效
+	common.InitSubscriptionConfig()
 }
 
 func loadOptionsFromDatabase() {
@@ -448,6 +458,13 @@ func updateOptionMap(key string, value string) (err error) {
 		setting.StreamCacheQueueLength, _ = strconv.Atoi(value)
 	case "PayMethods":
 		err = operation_setting.UpdatePayMethodsByJsonString(value)
+	// 订阅系统配置项
+	case common.OptionKeySubscriptionAutoWalletDefault,
+		common.OptionKeySubscriptionExpiryNoticeDays,
+		common.OptionKeySubscriptionMaxPerUser,
+		common.OptionKeySubscriptionQuotaLowThreshold,
+		common.OptionKeySubscriptionV2Enabled:
+		common.UpdateSubscriptionConfig(key, value)
 	}
 	return err
 }

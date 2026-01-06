@@ -228,6 +228,25 @@ func GetUUID() string {
 	return code
 }
 
+// GenerateUniqueOrderId 生成唯一的订单 ID
+// 使用 UUID 确保唯一性，避免时间戳碰撞风险
+func GenerateUniqueOrderId() int64 {
+	// 使用 UUID 的后 8 字节转换为 int64
+	// 这样既保证了唯一性，又能作为数值类型使用
+	u := uuid.New()
+	// 取 UUID 的后 8 字节作为 int64（保证正数）
+	bytes := u[8:16]
+	var id int64
+	for i := 0; i < 8; i++ {
+		id = (id << 8) | int64(bytes[i])
+	}
+	// 确保为正数
+	if id < 0 {
+		id = -id
+	}
+	return id
+}
+
 const keyChars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 func GenerateRandomCharsKey(length int) (string, error) {

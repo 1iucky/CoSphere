@@ -16,24 +16,25 @@ import (
 const MaxGroupPriorities = 10
 
 type Token struct {
-	Id                 int            `json:"id"`
-	UserId             int            `json:"user_id" gorm:"index"`
-	Key                string         `json:"key" gorm:"type:char(48);uniqueIndex"`
-	Status             int            `json:"status" gorm:"default:1"`
-	Name               string         `json:"name" gorm:"index" `
-	CreatedTime        int64          `json:"created_time" gorm:"bigint"`
-	AccessedTime       int64          `json:"accessed_time" gorm:"bigint"`
-	ExpiredTime        int64          `json:"expired_time" gorm:"bigint;default:-1"` // -1 means never expired
-	RemainQuota        int            `json:"remain_quota" gorm:"default:0"`
-	UnlimitedQuota     bool           `json:"unlimited_quota"`
-	ModelLimitsEnabled bool           `json:"model_limits_enabled"`
-	ModelLimits        string         `json:"model_limits" gorm:"type:varchar(1024);default:''"`
-	AllowIps           *string        `json:"allow_ips" gorm:"default:''"`
-	UsedQuota          int            `json:"used_quota" gorm:"default:0"`                           // used quota
-	Group              string         `json:"group" gorm:"default:''"`                               // 单分组(向后兼容)
-	GroupPriorities    string         `json:"group_priorities" gorm:"type:varchar(2048);default:''"` // 多分组优先级(JSON)
-	AutoSmartGroup     bool           `json:"auto_smart_group" gorm:"default:false"`                 // 自动智能分组
-	DeletedAt          gorm.DeletedAt `gorm:"index"`
+	Id                     int            `json:"id"`
+	UserId                 int            `json:"user_id" gorm:"index"`
+	Key                    string         `json:"key" gorm:"type:char(48);uniqueIndex"`
+	Status                 int            `json:"status" gorm:"default:1"`
+	Name                   string         `json:"name" gorm:"index" `
+	CreatedTime            int64          `json:"created_time" gorm:"bigint"`
+	AccessedTime           int64          `json:"accessed_time" gorm:"bigint"`
+	ExpiredTime            int64          `json:"expired_time" gorm:"bigint;default:-1"` // -1 means never expired
+	RemainQuota            int            `json:"remain_quota" gorm:"default:0"`
+	UnlimitedQuota         bool           `json:"unlimited_quota"`
+	ModelLimitsEnabled     bool           `json:"model_limits_enabled"`
+	ModelLimits            string         `json:"model_limits" gorm:"type:varchar(1024);default:''"`
+	AllowIps               *string        `json:"allow_ips" gorm:"default:''"`
+	UsedQuota              int            `json:"used_quota" gorm:"default:0"`                           // used quota
+	Group                  string         `json:"group" gorm:"default:''"`                               // 单分组(向后兼容)
+	GroupPriorities        string         `json:"group_priorities" gorm:"type:varchar(2048);default:''"` // 多分组优先级(JSON)
+	AutoSmartGroup         bool           `json:"auto_smart_group" gorm:"column:auto_smart_group;default:false"`             // 自动智能分组
+	SubscriptionPreferred  bool           `json:"subscription_preferred" gorm:"column:subscription_preferred;default:false"` // 是否优先使用订阅扣费
+	DeletedAt              gorm.DeletedAt `gorm:"index"`
 }
 
 // GroupPriority 分组优先级结构
@@ -271,7 +272,8 @@ func (token *Token) Update() (err error) {
 		}
 	}()
 	err = DB.Model(token).Select("name", "status", "expired_time", "remain_quota", "unlimited_quota",
-		"model_limits_enabled", "model_limits", "allow_ips", "group", "group_priorities", "auto_smart_group").Updates(token).Error
+		"model_limits_enabled", "model_limits", "allow_ips", "group", "group_priorities",
+		"auto_smart_group", "subscription_preferred").Updates(token).Error
 	return err
 }
 
