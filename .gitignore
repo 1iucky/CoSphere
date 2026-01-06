@@ -23,4 +23,5 @@ electron/node_modules
 electron/dist
 .gomodcache
 .gotmp
-pprofdatabase-backups/
+pprof
+database-backups
