@@ -669,6 +669,228 @@ POST /api/user/subscriptions/reorder
 
 ---
 
+### 用户订单
+
+> 用户订单相关 API，用于管理订阅订单的创建、预览、支付和取消。
+
+#### 获取我的订单列表
+
+```
+GET /api/user/subscriptions/orders
+```
+
+**查询参数**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| status | string | 订单状态筛选（pending/paid/cancelled/expired/failed） |
+| page | integer | 页码，默认 1 |
+| page_size | integer | 每页数量，默认 20，最大 100 |
+
+**响应示例**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "user_id": 100,
+      "plan_id": 1,
+      "plan_snapshot": "{}",
+      "payment_channel": "wallet",
+      "price_cents": 10000,
+      "discount_cents": 0,
+      "final_price_cents": 10000,
+      "status": "paid",
+      "created_at": 1704067200,
+      "updated_at": 1704067200
+    }
+  ],
+  "total": 1
+}
+```
+
+#### 获取订单详情
+
+```
+GET /api/user/subscriptions/orders/:id
+```
+
+#### 预览订单
+
+预览订单，计算价格（不实际创建订单）。
+
+```
+POST /api/user/subscriptions/orders/preview
+```
+
+**请求体**
+
+```json
+{
+  "plan_id": 1,
+  "coupon_code": "COUPON20250101ABC123"
+}
+```
+
+**响应示例**
+
+```json
+{
+  "success": true,
+  "data": {
+    "plan_id": 1,
+    "plan_name": "专业版月度套餐",
+    "price_cents": 10000,
+    "discount_cents": 1000,
+    "final_price_cents": 9000,
+    "currency": "CNY",
+    "coupon_applied": true,
+    "coupon_code": "COUPON20250101ABC123"
+  }
+}
+```
+
+#### 创建订单
+
+```
+POST /api/user/subscriptions/orders
+```
+
+**请求体**
+
+```json
+{
+  "plan_id": 1,
+  "coupon_code": "COUPON20250101ABC123",
+  "payment_channel": "wallet"
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| plan_id | integer | 是 | 套餐 ID |
+| coupon_code | string | 否 | 优惠券码 |
+| payment_channel | string | 是 | 支付渠道（wallet/alipay/wechat/stripe/paypal） |
+
+**响应示例**
+
+```json
+{
+  "success": true,
+  "data": {
+    "order_id": 1,
+    "plan_id": 1,
+    "final_price_cents": 9000,
+    "original_price": 10000,
+    "discount_amount": 1000,
+    "payment_channel": "wallet",
+    "status": "pending",
+    "is_idempotent": false,
+    "next_step": "调用 POST /api/subscription-orders/{order_id}/pay 完成支付"
+  }
+}
+```
+
+#### 一键购买订阅
+
+创建订单并使用钱包余额支付（合并创建和支付步骤）。
+
+```
+POST /api/user/subscriptions/orders/purchase
+```
+
+**请求体**
+
+```json
+{
+  "plan_id": 1,
+  "coupon_code": "COUPON20250101ABC123"
+}
+```
+
+**响应示例**
+
+```json
+{
+  "success": true,
+  "data": {
+    "order_id": 1,
+    "subscription_id": 1,
+    "plan_id": 1,
+    "start_at": 1704067200,
+    "end_at": 1706745600,
+    "amount_paid": 9000
+  }
+}
+```
+
+#### 支付订单
+
+```
+POST /api/user/subscriptions/orders/:id/pay
+```
+
+**请求体**
+
+```json
+{
+  "payment_channel": "wallet"
+}
+```
+
+**响应示例**
+
+```json
+{
+  "success": true,
+  "data": {
+    "subscription_id": 1,
+    "start_at": 1704067200,
+    "end_at": 1706745600
+  }
+}
+```
+
+#### 取消订单
+
+```
+POST /api/user/subscriptions/orders/:id/cancel
+```
+
+**请求体**
+
+```json
+{
+  "reason": "不需要了"
+}
+```
+
+#### 第三方支付入口
+
+##### 易支付
+
+```
+POST /api/user/subscriptions/orders/:id/pay/epay
+```
+
+**请求体**
+
+```json
+{
+  "payment_method": "alipay"
+}
+```
+
+##### Stripe 支付
+
+```
+POST /api/user/subscriptions/orders/:id/pay/stripe
+```
+
+---
+
 ### 用户设置
 
 #### 获取自动钱包兜底设置

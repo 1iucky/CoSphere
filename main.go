@@ -19,6 +19,7 @@ import (
 	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/router"
 	"github.com/QuantumNous/new-api/service"
+	"github.com/QuantumNous/new-api/setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 
 	"github.com/bytedance/gopkg/util/gopool"
@@ -256,5 +257,6 @@ func InitResources() error {
 	if err != nil {
 		return err
 	}
+	setting.SyncModelRequestConcurrencyLimitToRedis()
 	return nil
 }

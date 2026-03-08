@@ -10,10 +10,12 @@ import (
 )
 
 type OpenAIError struct {
-	Message string `json:"message"`
-	Type    string `json:"type"`
-	Param   string `json:"param"`
-	Code    any    `json:"code"`
+	Message string                 `json:"message"`
+	Type    string                 `json:"type"`
+	Param   string                 `json:"param"`
+	Code    any                    `json:"code"`
+	Details map[string]interface{} `json:"details,omitempty"` // 错误详情（设计文档 7.2）
+	Hint    string                 `json:"hint,omitempty"`    // 用户提示（设计文档 7.2）
 }
 
 type ClaudeError struct {
@@ -91,7 +93,7 @@ const (
 	ErrorCodeSubscriptionNotFound            ErrorCode = "subscription_not_found"
 	ErrorCodeSubscriptionExpired             ErrorCode = "subscription_expired"
 	ErrorCodeSubscriptionNotActive           ErrorCode = "subscription_not_active"
-	ErrorCodeSubscriptionLimitReached        ErrorCode = "subscription_limit_reached"
+	ErrorCodeSubscriptionLimitReached        ErrorCode = "SUBSCRIPTION_LIMIT_REACHED"
 	ErrorCodeSubscriptionQuotaExhausted      ErrorCode = "subscription_quota_exhausted"
 	ErrorCodeSubscriptionConflict            ErrorCode = "subscription_conflict"
 	ErrorCodeSubscriptionCancelled           ErrorCode = "subscription_cancelled"
@@ -178,6 +180,8 @@ type NewAPIError struct {
 	errorType      ErrorType
 	errorCode      ErrorCode
 	StatusCode     int
+	Details        map[string]interface{} // 错误详情（设计文档要求）
+	Hint           string                 // 用户提示信息（设计文档要求）
 }
 
 func (e *NewAPIError) GetErrorCode() ErrorCode {
@@ -253,6 +257,17 @@ func (e *NewAPIError) ToOpenAIError() OpenAIError {
 	if result.Message == "" {
 		result.Message = string(e.errorType)
 	}
+
+	// 填充 Details 和 Hint（设计文档 7.2 错误响应格式）
+	if e.Details != nil {
+		result.Details = e.Details
+	}
+	if e.Hint != "" {
+		result.Hint = e.Hint
+		// 将 hint 追加到 message 末尾，确保旧客户端也能看到提示
+		result.Message = result.Message + "。" + e.Hint
+	}
+
 	return result
 }
 
@@ -447,4 +462,18 @@ func IsRecordErrorLog(e *NewAPIError) bool {
 		return true
 	}
 	return *e.recordErrorLog
+}
+
+// ErrOptionWithDetails 设置错误详情（设计文档要求的 details 字段）
+func ErrOptionWithDetails(details map[string]interface{}) NewAPIErrorOptions {
+	return func(e *NewAPIError) {
+		e.Details = details
+	}
+}
+
+// ErrOptionWithHint 设置用户提示信息（设计文档要求的 hint 字段）
+func ErrOptionWithHint(hint string) NewAPIErrorOptions {
+	return func(e *NewAPIError) {
+		e.Hint = hint
+	}
 }

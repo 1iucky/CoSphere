@@ -409,12 +409,15 @@ PostConsumeQuota()
     },
     "auto_wallet_fallback": false,
     "priority": 1
-  },
-  "billing_hint": {
-    "skip_reason": "subscription_preferred_disabled"
   }
 }
 ```
+
+**注意**: 计费提示（如跳过订阅扣费的原因）通过 relay API 响应的 HTTP 头返回：
+- `X-New-Api-Billing-Source`: 计费来源（subscription/wallet/fallback/skipped）
+- `X-New-Api-Billing-Skip-Reason`: 跳过订阅扣费的原因（仅当跳过时设置）
+
+订阅列表接口不返回 `billing_hint`，因为计费提示描述的是请求上下文中为什么跳过订阅计费，与具体订阅状态无关。
 
 ---
 

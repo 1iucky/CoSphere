@@ -459,6 +459,13 @@ func (s *SubscriptionUsageService) TryPreConsume(
 						period, usage.UsedQuota, usage.LimitQuota, amount),
 					types.ErrorCodeUsageQuotaExceeded,
 					http.StatusTooManyRequests,
+					types.ErrOptionWithDetails(map[string]interface{}{
+						"subscription_id": subscriptionId,
+						"period":          period,
+						"limit_quota":     usage.LimitQuota,
+						"used_quota":      usage.UsedQuota,
+						"requested":       amount,
+					}),
 				)
 			}
 
@@ -475,10 +482,18 @@ func (s *SubscriptionUsageService) TryPreConsume(
 			}
 
 			if result.RowsAffected == 0 {
+				// 并发场景：其他事务已更新，额度不足
 				return types.NewErrorWithStatusCode(
 					fmt.Errorf("周期 [%s] %s", period, common.MsgSubscriptionQuotaExhausted),
 					types.ErrorCodeUsageQuotaExceeded,
 					http.StatusTooManyRequests,
+					types.ErrOptionWithDetails(map[string]interface{}{
+						"subscription_id": subscriptionId,
+						"period":          period,
+						"limit_quota":     usage.LimitQuota,
+						"used_quota":      usage.UsedQuota, // 并发前的值，实际可能更高
+						"requested":       amount,
+					}),
 				)
 			}
 
@@ -585,6 +600,13 @@ func (s *SubscriptionUsageService) TryPreConsumeWithStrategies(
 						period, usage.UsedQuota, usage.LimitQuota, amount),
 					types.ErrorCodeUsageQuotaExceeded,
 					http.StatusTooManyRequests,
+					types.ErrOptionWithDetails(map[string]interface{}{
+						"subscription_id": subscriptionId,
+						"period":          period,
+						"limit_quota":     usage.LimitQuota,
+						"used_quota":      usage.UsedQuota,
+						"requested":       amount,
+					}),
 				)
 			}
 
@@ -599,10 +621,18 @@ func (s *SubscriptionUsageService) TryPreConsumeWithStrategies(
 			}
 
 			if result.RowsAffected == 0 {
+				// 并发场景：其他事务已更新，额度不足
 				return types.NewErrorWithStatusCode(
 					fmt.Errorf("周期 [%s] %s", period, common.MsgSubscriptionQuotaExhausted),
 					types.ErrorCodeUsageQuotaExceeded,
 					http.StatusTooManyRequests,
+					types.ErrOptionWithDetails(map[string]interface{}{
+						"subscription_id": subscriptionId,
+						"period":          period,
+						"limit_quota":     usage.LimitQuota,
+						"used_quota":      usage.UsedQuota, // 并发前的值，实际可能更高
+						"requested":       amount,
+					}),
 				)
 			}
 
@@ -704,6 +734,13 @@ func (s *SubscriptionUsageService) TryPreConsumeWithTx(
 					period, usage.UsedQuota, usage.LimitQuota, amount),
 				types.ErrorCodeUsageQuotaExceeded,
 				http.StatusTooManyRequests,
+				types.ErrOptionWithDetails(map[string]interface{}{
+					"subscription_id": subscriptionId,
+					"period":          period,
+					"limit_quota":     usage.LimitQuota,
+					"used_quota":      usage.UsedQuota,
+					"requested":       amount,
+				}),
 			)
 		}
 
@@ -718,10 +755,18 @@ func (s *SubscriptionUsageService) TryPreConsumeWithTx(
 		}
 
 		if result.RowsAffected == 0 {
+			// 并发场景：其他事务已更新，额度不足
 			return nil, types.NewErrorWithStatusCode(
 				fmt.Errorf("周期 [%s] %s", period, common.MsgSubscriptionQuotaExhausted),
 				types.ErrorCodeUsageQuotaExceeded,
 				http.StatusTooManyRequests,
+				types.ErrOptionWithDetails(map[string]interface{}{
+					"subscription_id": subscriptionId,
+					"period":          period,
+					"limit_quota":     usage.LimitQuota,
+					"used_quota":      usage.UsedQuota, // 并发前的值，实际可能更高
+					"requested":       amount,
+				}),
 			)
 		}
 

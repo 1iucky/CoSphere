@@ -391,6 +391,8 @@ const (
 	DefaultSubscriptionMaxPerUser         = 10      // 默认每用户最多10个订阅
 	DefaultSubscriptionQuotaLowThreshold  = 0.2     // 默认额度低于20%提醒
 	DefaultSubscriptionV2Enabled          = false   // 默认订阅系统关闭
+	DefaultSubscriptionGrayscaleThreshold = 0       // 默认灰度阈值0%（关闭灰度）
+	DefaultSubscriptionGrayscaleMode      = "off"   // 默认灰度模式：off/percentage/user_id
 )
 
 // Token 订阅偏好设置（对应 tokens.subscription_preferred 字段）
@@ -408,6 +410,15 @@ const (
 	OptionKeySubscriptionMaxPerUser         = "SUBSCRIPTION_MAX_PER_USER"         // 每用户最大订阅数
 	OptionKeySubscriptionQuotaLowThreshold  = "SUBSCRIPTION_QUOTA_LOW_THRESHOLD"  // 额度低阈值
 	OptionKeySubscriptionV2Enabled          = "SUBSCRIPTION_V2_ENABLED"           // 订阅系统启用开关
+	OptionKeySubscriptionGrayscaleThreshold = "SUBSCRIPTION_GRAYSCALE_THRESHOLD"  // 灰度发布阈值（0-100）
+	OptionKeySubscriptionGrayscaleMode      = "SUBSCRIPTION_GRAYSCALE_MODE"       // 灰度模式：off/percentage/user_id
+)
+
+// 灰度模式常量
+const (
+	GrayscaleModeOff        = "off"        // 关闭灰度（完全由 V2Enabled 控制）
+	GrayscaleModePercentage = "percentage" // 按百分比随机灰度
+	GrayscaleModeUserID     = "user_id"    // 按用户ID灰度（user_id % 100 < threshold）
 )
 
 // 订阅优先级（数字越小优先级越高）

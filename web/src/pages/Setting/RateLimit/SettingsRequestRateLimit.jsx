@@ -39,6 +39,10 @@ export default function RequestRateLimit(props) {
     ModelRequestRateLimitSuccessCount: 1000,
     ModelRequestRateLimitDurationMinutes: 1,
     ModelRequestRateLimitGroup: '',
+    ModelRequestRateLimitScope: 'user',
+    ModelRequestConcurrencyLimitEnabled: false,
+    ModelRequestConcurrencyLimitUserGroup: '',
+    ModelRequestConcurrencyLimitTokenGroup: '',
   });
   const refForm = useRef();
   const [inputsRow, setInputsRow] = useState(inputs);
@@ -142,6 +146,34 @@ export default function RequestRateLimit(props) {
               </Col>
             </Row>
             <Row>
+              <Col xs={24} sm={16}>
+                <Form.RadioGroup
+                  field='ModelRequestRateLimitScope'
+                  label={t('速率限制粒度')}
+                  type='button'
+                  onChange={(value) =>
+                    setInputs({
+                      ...inputs,
+                      ModelRequestRateLimitScope: value,
+                    })
+                  }
+                  extraText={
+                    <div>
+                      <p>{t('说明：')}</p>
+                      <ul>
+                        <li>{t('用户粒度：同一用户所有令牌共享限流配额')}</li>
+                        <li>{t('令牌粒度：每个令牌独立计算限流配额')}</li>
+                        <li>{t('速率限制与并发限制相互独立，同时生效')}</li>
+                      </ul>
+                    </div>
+                  }
+                >
+                  <Form.Radio value='user'>{t('用户粒度')}</Form.Radio>
+                  <Form.Radio value='token'>{t('令牌粒度')}</Form.Radio>
+                </Form.RadioGroup>
+              </Col>
+            </Row>
+            <Row>
               <Col xs={24} sm={12} md={8} lg={8} xl={8}>
                 <Form.InputNumber
                   label={t('用户每周期最多请求次数')}
@@ -229,12 +261,114 @@ export default function RequestRateLimit(props) {
                 />
               </Col>
             </Row>
+          </Form.Section>
+          <Form.Section text={t('模型请求并发限制')}>
+            <Row gutter={16}>
+              <Col xs={24} sm={12} md={8} lg={8} xl={8}>
+                <Form.Switch
+                  field={'ModelRequestConcurrencyLimitEnabled'}
+                  label={t('启用用户模型请求并发限制（可能会影响高并发性能）')}
+                  size='default'
+                  checkedText='｜'
+                  uncheckedText='〇'
+                  onChange={(value) => {
+                    setInputs({
+                      ...inputs,
+                      ModelRequestConcurrencyLimitEnabled: value,
+                    });
+                  }}
+                />
+              </Col>
+            </Row>
             <Row>
-              <Button size='default' onClick={onSubmit}>
-                {t('保存模型速率限制')}
-              </Button>
+              <Col xs={24} sm={16}>
+                <Form.TextArea
+                  label={t('用户并发限制')}
+                  placeholder={t(
+                    '{\n  "default": 3,\n  "vip": 5\n}',
+                  )}
+                  field={'ModelRequestConcurrencyLimitUserGroup'}
+                  autosize={{ minRows: 4, maxRows: 15 }}
+                  trigger='blur'
+                  stopValidateWithError
+                  rules={[
+                    {
+                      validator: (rule, value) => verifyJSON(value),
+                      message: t('不是合法的 JSON 字符串'),
+                    },
+                  ]}
+                  extraText={
+                    <div>
+                      <p>{t('说明：')}</p>
+                      <ul>
+                        <li>
+                          {t(
+                            '使用 JSON 对象格式，格式为：{"组名": 并发数}',
+                          )}
+                        </li>
+                        <li>
+                          {t('示例：{"default": 3, "vip": 5}。')}
+                        </li>
+                        <li>{t('并发数必须大于等于0，0代表不限制。')}</li>
+                        <li>{t('按用户ID维度分别统计并发数。')}</li>
+                      </ul>
+                    </div>
+                  }
+                  onChange={(value) => {
+                    setInputs({
+                      ...inputs,
+                      ModelRequestConcurrencyLimitUserGroup: value,
+                    });
+                  }}
+                />
+              </Col>
+            </Row>
+            <Row>
+              <Col xs={24} sm={16}>
+                <Form.TextArea
+                  label={t('令牌并发限制')}
+                  placeholder={t('{\n  "default": 2\n}')}
+                  field={'ModelRequestConcurrencyLimitTokenGroup'}
+                  autosize={{ minRows: 4, maxRows: 15 }}
+                  trigger='blur'
+                  stopValidateWithError
+                  rules={[
+                    {
+                      validator: (rule, value) => verifyJSON(value),
+                      message: t('不是合法的 JSON 字符串'),
+                    },
+                  ]}
+                  extraText={
+                    <div>
+                      <p>{t('说明：')}</p>
+                      <ul>
+                        <li>
+                          {t(
+                            '使用 JSON 对象格式，格式为：{"组名": 并发数}',
+                          )}
+                        </li>
+                        <li>{t('示例：{"default": 2}。')}</li>
+                        <li>{t('并发数必须大于等于0，0代表不限制。')}</li>
+                        <li>{t('按令牌维度分别统计并发数。')}</li>
+                        <li>{t('用户与令牌并发限制会同时校验，任一超限都会拒绝。')}</li>
+                      </ul>
+                    </div>
+                  }
+                  onChange={(value) => {
+                    setInputs({
+                      ...inputs,
+                      ModelRequestConcurrencyLimitTokenGroup: value,
+                    });
+                  }}
+                />
+              </Col>
             </Row>
           </Form.Section>
+          <Row>
+            <Button size='default' onClick={onSubmit}>
+              {t('保存模型速率限制')}
+            </Button>
+          </Row>
         </Form>
       </Spin>
     </>

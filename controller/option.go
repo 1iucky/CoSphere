@@ -192,6 +192,32 @@ func UpdateOption(c *gin.Context) {
 			})
 			return
 		}
+	case "ModelRequestRateLimitScope":
+		if option.Value.(string) != setting.RateLimitScopeUser && option.Value.(string) != setting.RateLimitScopeToken {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "速率限制粒度必须为 'user' 或 'token'",
+			})
+			return
+		}
+	case "ModelRequestConcurrencyLimitUserGroup":
+		err = setting.CheckModelRequestConcurrencyLimitUserGroup(option.Value.(string))
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": err.Error(),
+			})
+			return
+		}
+	case "ModelRequestConcurrencyLimitTokenGroup":
+		err = setting.CheckModelRequestConcurrencyLimitTokenGroup(option.Value.(string))
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": err.Error(),
+			})
+			return
+		}
 	case "console_setting.api_info":
 		err = console_setting.ValidateConsoleSettings(option.Value.(string), "ApiInfo")
 		if err != nil {

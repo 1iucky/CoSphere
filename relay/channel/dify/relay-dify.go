@@ -284,6 +284,8 @@ func difyHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respons
 		return nil, types.NewError(err, types.ErrorCodeBadResponseBody)
 	}
 	c.Writer.Header().Set("Content-Type", "application/json")
+	// 从 context 读取并设置计费响应头
+	service.SetBillingHeadersFromContext(c)
 	c.Writer.WriteHeader(resp.StatusCode)
 	c.Writer.Write(jsonResponse)
 	return &difyResponse.MetaData.Usage, nil

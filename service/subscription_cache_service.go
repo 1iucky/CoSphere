@@ -34,6 +34,9 @@ func GetSubscriptionCacheService() *SubscriptionCacheService {
 			cacheHits:       0,
 			cacheMisses:     0,
 		}
+
+		// 注册 feature flag 变更回调
+		common.RegisterFeatureFlagChangeCallback(subscriptionCacheService.OnFeatureFlagChange)
 	})
 	return subscriptionCacheService
 }
@@ -539,3 +542,116 @@ func (s *SubscriptionCacheService) ResetCacheStats() {
 // - 使用 prometheus.CounterVec 记录 cache_hits_total{type="subscription"}
 // - 使用 prometheus.CounterVec 记录 cache_misses_total{type="subscription"}
 // - 使用 prometheus.HistogramVec 记录 cache_access_duration_seconds{type="subscription"}
+
+// ===================== Feature Flag 联动 =====================
+
+// OnFeatureFlagChange 当订阅系统 feature flag 变更时的缓存处理
+// 当 V2Enabled 或灰度设置变更时调用此方法
+// 参数:
+//   - oldEnabled: 变更前的有效启用状态
+//   - newEnabled: 变更后的有效启用状态
+//   - v2EnabledChanged: 全局开关是否变化（用于处理灰度已开启时全局开关切换的场景）
+//   - grayscaleChanged: 灰度设置是否变更
+func (s *SubscriptionCacheService) OnFeatureFlagChange(oldEnabled, newEnabled, v2EnabledChanged, grayscaleChanged bool) {
+	if !common.RedisEnabled || common.RDB == nil {
+		return
+	}
+
+	// 记录日志
+	common.SysLog(fmt.Sprintf(
+		"订阅系统 feature flag 变更: enabled %v -> %v, v2_enabled_changed=%v, grayscale_changed=%v",
+		oldEnabled, newEnabled, v2EnabledChanged, grayscaleChanged,
+	))
+
+	// 情况1: 有效启用状态变化 - 清除所有缓存
+	// 情况2: 全局开关变化（即使有效状态不变，如灰度已开启时切换全局开关）- 清除所有缓存
+	//        这是因为全局开关变化会影响之前不在灰度范围内的用户
+	// 情况3: 灰度设置变更 - 清除所有缓存，确保新设置生效
+	// 注意：任何配置变更都需要清除缓存，避免使用旧数据
+
+	if oldEnabled != newEnabled || v2EnabledChanged || grayscaleChanged {
+		// 异步清除缓存，避免阻塞配置更新
+		go func() {
+			if err := s.InvalidateAllSubscriptionCaches(); err != nil {
+				common.SysError(fmt.Sprintf("清除订阅缓存失败: %v", err))
+			}
+		}()
+	}
+}
+
+// InvalidateAllSubscriptionCaches 清除所有订阅相关缓存
+// 使用 Redis SCAN 命令安全地批量删除，避免阻塞 Redis
+func (s *SubscriptionCacheService) InvalidateAllSubscriptionCaches() error {
+	if !common.RedisEnabled || common.RDB == nil {
+		return nil
+	}
+
+	ctx := common.RDB.Context()
+
+	// 清除活跃订阅缓存
+	activePattern := activeSubscriptionsCacheKeyPrefix + "*"
+	activeDeletedCount, err := s.scanAndDelete(ctx, activePattern)
+	if err != nil {
+		common.SysError(fmt.Sprintf("清除活跃订阅缓存失败: %v", err))
+	} else {
+		common.SysLog(fmt.Sprintf("已清除 %d 个活跃订阅缓存", activeDeletedCount))
+	}
+
+	// 清除使用量缓存
+	usagePattern := subscriptionUsageCacheKeyPrefix + "*"
+	usageDeletedCount, err := s.scanAndDelete(ctx, usagePattern)
+	if err != nil {
+		common.SysError(fmt.Sprintf("清除使用量缓存失败: %v", err))
+	} else {
+		common.SysLog(fmt.Sprintf("已清除 %d 个使用量缓存", usageDeletedCount))
+	}
+
+	// 重置缓存统计
+	s.ResetCacheStats()
+
+	return nil
+}
+
+// scanAndDelete 使用 SCAN 命令安全地批量删除匹配的键
+func (s *SubscriptionCacheService) scanAndDelete(ctx interface{}, pattern string) (int64, error) {
+	var deletedCount int64 = 0
+	var cursor uint64 = 0
+	batchSize := int64(100) // 每批处理 100 个键
+
+	for {
+		// 使用 SCAN 命令迭代键
+		keys, nextCursor, err := common.RDB.Scan(common.RDB.Context(), cursor, pattern, batchSize).Result()
+		if err != nil {
+			return deletedCount, err
+		}
+
+		// 批量删除
+		if len(keys) > 0 {
+			deleted, err := common.RDB.Del(common.RDB.Context(), keys...).Result()
+			if err != nil {
+				common.SysError(fmt.Sprintf("批量删除缓存键失败: %v", err))
+			} else {
+				deletedCount += deleted
+			}
+		}
+
+		// 检查是否完成
+		cursor = nextCursor
+		if cursor == 0 {
+			break
+		}
+	}
+
+	return deletedCount, nil
+}
+
+// GetFeatureFlagStatus 获取当前 feature flag 状态（用于调试）
+func (s *SubscriptionCacheService) GetFeatureFlagStatus() map[string]interface{} {
+	config := common.GetSubscriptionConfig()
+	return map[string]interface{}{
+		"v2_enabled":           config.V2Enabled,
+		"grayscale_mode":       config.GrayscaleMode,
+		"grayscale_threshold":  config.GrayscaleThreshold,
+		"cache_stats":          s.GetCacheStats(),
+	}
+}

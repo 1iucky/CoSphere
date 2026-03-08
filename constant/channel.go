@@ -54,6 +54,9 @@ const (
 	ChannelTypeDoubaoVideo    = 54
 	ChannelTypeSora           = 55
 	ChannelTypeReplicate      = 56
+	ChannelTypeZhipuCoding    = 57
+	ChannelTypeQwenCoding     = 58
+	ChannelTypeMiniMaxCoding  = 59
 	ChannelTypeDummy          // this one is only for count, do not add any channel after this
 
 )
@@ -116,6 +119,9 @@ var ChannelBaseURLs = []string{
 	"https://ark.cn-beijing.volces.com",         //54
 	"https://api.openai.com",                    //55
 	"https://api.replicate.com",                 //56
+	"https://open.bigmodel.cn",                  //57
+	"https://coding.dashscope.aliyuncs.com",     //58
+	"https://api.minimaxi.com",                  //59
 }
 
 var ChannelTypeNames = map[int]string{
@@ -172,6 +178,9 @@ var ChannelTypeNames = map[int]string{
 	ChannelTypeDoubaoVideo:    "DoubaoVideo",
 	ChannelTypeSora:           "Sora",
 	ChannelTypeReplicate:      "Replicate",
+	ChannelTypeZhipuCoding:    "ZhipuCoding",
+	ChannelTypeQwenCoding:     "QwenCoding",
+	ChannelTypeMiniMaxCoding:  "MiniMaxCoding",
 }
 
 func GetChannelTypeName(channelType int) string {

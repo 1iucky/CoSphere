@@ -294,8 +294,11 @@ func ActivateSubscriptionAdmin(c *gin.Context) {
 		return
 	}
 
+	// 缓存预热：订阅激活后主动预热缓存（而不是仅失效等待回源）
 	cacheSvc := service.GetSubscriptionCacheService()
-	_ = cacheSvc.InvalidateOnStatusChange(sub.UserId, sub.Id)
+	go func() {
+		_ = cacheSvc.WarmupCache(sub.UserId)
+	}()
 	service.GetSubscriptionPriorityService().InvalidateUserSubscriptionCache(sub.UserId)
 
 	c.JSON(http.StatusOK, gin.H{

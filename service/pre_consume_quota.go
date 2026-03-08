@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
@@ -15,6 +16,14 @@ import (
 
 	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/gin-gonic/gin"
+)
+
+// 订阅判定性能监控阈值
+const (
+	// 订阅判定目标耗时阈值 (P99 ≤5ms)
+	subscriptionBillingThresholdMs = 5
+	// 性能警告阈值 (>10ms 记录警告)
+	subscriptionBillingWarningMs = 10
 )
 
 func ReturnPreConsumedQuota(c *gin.Context, relayInfo *relaycommon.RelayInfo) {
@@ -64,10 +73,23 @@ func PreConsumeQuota(c *gin.Context, preConsumedQuota int, relayInfo *relaycommo
 	useWallet := true
 	var billingCtx *BillingContext
 
-	if common.IsSubscriptionEnabled() {
+	// 性能监控：记录订阅判定开始时间
+	var subscriptionBillingStart time.Time
+
+	// 使用灰度判断逻辑，支持按用户ID灰度
+	subscriptionEnabled, grayscaleReason := common.IsSubscriptionEnabledForUser(relayInfo.UserId)
+	if subscriptionEnabled {
+		subscriptionBillingStart = time.Now()
+
+		// 记录灰度命中原因，便于调试
+		if grayscaleReason != "global_enabled" {
+			logger.LogInfo(c, fmt.Sprintf("用户 %d 命中订阅灰度: %s", relayInfo.UserId, grayscaleReason))
+		}
 		billingSvc := GetSubscriptionBillingService()
 		ctx, err := billingSvc.SelectCandidate(int64(relayInfo.UserId), relayInfo.OriginModelName, "", relayInfo)
 		if err != nil {
+			// 性能监控：记录失败时的耗时
+			logSubscriptionBillingDuration(c, subscriptionBillingStart, relayInfo.UserId, "select_candidate_error")
 			return types.NewError(err, types.ErrorCodeSubscriptionOperationFailed, types.ErrOptionWithSkipRetry())
 		}
 
@@ -75,12 +97,24 @@ func PreConsumeQuota(c *gin.Context, preConsumedQuota int, relayInfo *relaycommo
 			switch ctx.Source {
 			case BillingSourceSkipped:
 				relayInfo.BillingSkipReason = ctx.SkipReason
-				relayInfo.BillingSource = BillingSourceWallet
+				relayInfo.BillingSource = BillingSourceSkipped
+				// 性能监控：记录跳过时的耗时
+				logSubscriptionBillingDuration(c, subscriptionBillingStart, relayInfo.UserId, "skipped")
 			case BillingSourceWallet:
 				relayInfo.BillingSource = BillingSourceWallet
+				// 性能监控：记录使用钱包时的耗时
+				logSubscriptionBillingDuration(c, subscriptionBillingStart, relayInfo.UserId, "wallet")
 			default:
+				// 当预扣额度 <= 0 时（如 freeModel），跳过订阅扣费，使用钱包路径
+				if preConsumedQuota <= 0 {
+					relayInfo.BillingSource = BillingSourceWallet
+					logSubscriptionBillingDuration(c, subscriptionBillingStart, relayInfo.UserId, "wallet_free_model")
+					break
+				}
 				result, err := billingSvc.TryBilling(ctx, int64(preConsumedQuota), relayInfo)
 				if err != nil {
+					// 性能监控：记录 TryBilling 失败时的耗时
+					logSubscriptionBillingDuration(c, subscriptionBillingStart, relayInfo.UserId, "try_billing_error")
 					if apiErr, ok := err.(*types.NewAPIError); ok {
 						return apiErr
 					}
@@ -100,6 +134,14 @@ func PreConsumeQuota(c *gin.Context, preConsumedQuota int, relayInfo *relaycommo
 						common.SetContextKey(c, constant.ContextKeyUsingGroup, group)
 						relayInfo.UsingGroup = group
 					}
+					// 性能监控：记录订阅扣费成功时的耗时
+					logSubscriptionBillingDuration(c, subscriptionBillingStart, relayInfo.UserId, "subscription")
+				} else if result.Source == BillingSourceFallback {
+					// 性能监控：记录 fallback 时的耗时
+					logSubscriptionBillingDuration(c, subscriptionBillingStart, relayInfo.UserId, "fallback")
+				} else {
+					// 性能监控：记录使用钱包时的耗时
+					logSubscriptionBillingDuration(c, subscriptionBillingStart, relayInfo.UserId, "wallet_after_try")
 				}
 			}
 		}
@@ -116,6 +158,13 @@ func PreConsumeQuota(c *gin.Context, preConsumedQuota int, relayInfo *relaycommo
 			}
 		}
 		relayInfo.FinalPreConsumedQuota = preConsumedQuota
+
+		// 将 billing 信息存入 context，用于 IOCopyBytesGracefully 和 StreamScannerHandler 统一设置响应头
+		c.Set(string(constant.ContextKeyBillingSource), relayInfo.BillingSource)
+		if relayInfo.BillingSkipReason != "" {
+			c.Set(string(constant.ContextKeyBillingSkipReason), relayInfo.BillingSkipReason)
+		}
+
 		return nil
 	}
 
@@ -166,6 +215,13 @@ func PreConsumeQuota(c *gin.Context, preConsumedQuota int, relayInfo *relaycommo
 	if relayInfo.BillingSource == "" {
 		relayInfo.BillingSource = BillingSourceWallet
 	}
+
+	// 将 billing 信息存入 context，用于 IOCopyBytesGracefully 和 StreamScannerHandler 统一设置响应头
+	c.Set(string(constant.ContextKeyBillingSource), relayInfo.BillingSource)
+	if relayInfo.BillingSkipReason != "" {
+		c.Set(string(constant.ContextKeyBillingSkipReason), relayInfo.BillingSkipReason)
+	}
+
 	return nil
 }
 
@@ -181,4 +237,42 @@ func firstGroup(groupStr string) string {
 		}
 	}
 	return ""
+}
+
+// ===================== 性能监控 =====================
+
+// logSubscriptionBillingDuration 记录订阅判定耗时
+// 当耗时超过阈值时记录警告日志，便于性能分析和优化
+// 参数:
+//   - c: gin.Context 用于日志上下文
+//   - start: 开始时间
+//   - userId: 用户 ID
+//   - source: 计费来源（subscription/wallet/fallback/skipped/error）
+func logSubscriptionBillingDuration(c *gin.Context, start time.Time, userId int, source string) {
+	if start.IsZero() {
+		return
+	}
+
+	duration := time.Since(start)
+	durationMs := float64(duration.Microseconds()) / 1000.0
+
+	// 记录性能指标到缓存服务（用于统计）
+	GetSubscriptionBillingService().RecordBillingDuration(durationMs, source)
+
+	// 超过警告阈值（>10ms）时记录警告
+	if durationMs > subscriptionBillingWarningMs {
+		logger.LogWarn(c, fmt.Sprintf(
+			"[性能警告] 订阅判定耗时 %.2fms (阈值: %dms), user_id=%d, source=%s",
+			durationMs, subscriptionBillingWarningMs, userId, source,
+		))
+		return
+	}
+
+	// 超过目标阈值（>5ms）时记录调试信息
+	if durationMs > subscriptionBillingThresholdMs {
+		logger.LogDebug(c, fmt.Sprintf(
+			"[性能监控] 订阅判定耗时 %.2fms (目标: %dms), user_id=%d, source=%s",
+			durationMs, subscriptionBillingThresholdMs, userId, source,
+		))
+	}
 }

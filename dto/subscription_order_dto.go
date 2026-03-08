@@ -33,7 +33,7 @@ type SubscriptionOrderResponse struct {
 type SubscriptionOrderListRequest struct {
 	UserID         *int64 `form:"user_id" binding:"omitempty,min=1"`
 	PlanID         *int64 `form:"plan_id" binding:"omitempty,min=1"`
-	Status         string `form:"status" binding:"omitempty,oneof=pending paid cancelled expired failed"`
+	Status         string `form:"status" binding:"omitempty,oneof=pending paid cancelled expired failed refunded"`
 	PaymentChannel string `form:"payment_channel" binding:"omitempty"`
 	StartTime      *int64 `form:"start_time" binding:"omitempty,min=0"`
 	EndTime        *int64 `form:"end_time" binding:"omitempty,min=0"`

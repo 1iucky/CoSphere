@@ -283,6 +283,8 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 	}
 
 	c.Writer.Header().Set("Content-Type", "application/json")
+	// 从 context 读取并设置计费响应头
+	service.SetBillingHeadersFromContext(c)
 	c.Writer.WriteHeader(http.StatusOK)
 	_, _ = c.Writer.Write(responseBytes)
 

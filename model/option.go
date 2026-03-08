@@ -111,6 +111,9 @@ func InitOptionMap() {
 	common.OptionMap["ModelRequestRateLimitDurationMinutes"] = strconv.Itoa(setting.ModelRequestRateLimitDurationMinutes)
 	common.OptionMap["ModelRequestRateLimitSuccessCount"] = strconv.Itoa(setting.ModelRequestRateLimitSuccessCount)
 	common.OptionMap["ModelRequestRateLimitGroup"] = setting.ModelRequestRateLimitGroup2JSONString()
+	common.OptionMap["ModelRequestRateLimitScope"] = setting.ModelRequestRateLimitScope
+	common.OptionMap["ModelRequestConcurrencyLimitUserGroup"] = setting.ModelRequestConcurrencyLimitUserGroup2JSONString()
+	common.OptionMap["ModelRequestConcurrencyLimitTokenGroup"] = setting.ModelRequestConcurrencyLimitTokenGroup2JSONString()
 	common.OptionMap["ModelRatio"] = ratio_setting.ModelRatio2JSONString()
 	common.OptionMap["ModelPrice"] = ratio_setting.ModelPrice2JSONString()
 	common.OptionMap["CacheRatio"] = ratio_setting.CacheRatio2JSONString()
@@ -138,6 +141,7 @@ func InitOptionMap() {
 	common.OptionMap["DemoSiteEnabled"] = strconv.FormatBool(operation_setting.DemoSiteEnabled)
 	common.OptionMap["SelfUseModeEnabled"] = strconv.FormatBool(operation_setting.SelfUseModeEnabled)
 	common.OptionMap["ModelRequestRateLimitEnabled"] = strconv.FormatBool(setting.ModelRequestRateLimitEnabled)
+	common.OptionMap["ModelRequestConcurrencyLimitEnabled"] = strconv.FormatBool(setting.ModelRequestConcurrencyLimitEnabled)
 	common.OptionMap["CheckSensitiveOnPromptEnabled"] = strconv.FormatBool(setting.CheckSensitiveOnPromptEnabled)
 	common.OptionMap["StopOnSensitiveEnabled"] = strconv.FormatBool(setting.StopOnSensitiveEnabled)
 	common.OptionMap["SensitiveWords"] = setting.SensitiveWordsToString()
@@ -151,6 +155,8 @@ func InitOptionMap() {
 	common.OptionMap[common.OptionKeySubscriptionMaxPerUser] = strconv.Itoa(common.DefaultSubscriptionMaxPerUser)
 	common.OptionMap[common.OptionKeySubscriptionQuotaLowThreshold] = strconv.FormatFloat(common.DefaultSubscriptionQuotaLowThreshold, 'f', -1, 64)
 	common.OptionMap[common.OptionKeySubscriptionV2Enabled] = strconv.FormatBool(common.DefaultSubscriptionV2Enabled)
+	common.OptionMap[common.OptionKeySubscriptionGrayscaleThreshold] = strconv.Itoa(common.DefaultSubscriptionGrayscaleThreshold)
+	common.OptionMap[common.OptionKeySubscriptionGrayscaleMode] = common.DefaultSubscriptionGrayscaleMode
 
 	// 自动添加所有注册的模型配置
 	modelConfigs := config.GlobalConfig.ExportAllConfigs()
@@ -294,6 +300,8 @@ func updateOptionMap(key string, value string) (err error) {
 			setting.CheckSensitiveOnPromptEnabled = boolValue
 		case "ModelRequestRateLimitEnabled":
 			setting.ModelRequestRateLimitEnabled = boolValue
+		case "ModelRequestConcurrencyLimitEnabled":
+			setting.ModelRequestConcurrencyLimitEnabled = boolValue
 		case "StopOnSensitiveEnabled":
 			setting.StopOnSensitiveEnabled = boolValue
 		case "SMTPSSLEnabled":
@@ -414,6 +422,12 @@ func updateOptionMap(key string, value string) (err error) {
 		setting.ModelRequestRateLimitSuccessCount, _ = strconv.Atoi(value)
 	case "ModelRequestRateLimitGroup":
 		err = setting.UpdateModelRequestRateLimitGroupByJSONString(value)
+	case "ModelRequestRateLimitScope":
+		setting.ModelRequestRateLimitScope = value
+	case "ModelRequestConcurrencyLimitUserGroup":
+		err = setting.UpdateModelRequestConcurrencyLimitUserGroupByJSONString(value)
+	case "ModelRequestConcurrencyLimitTokenGroup":
+		err = setting.UpdateModelRequestConcurrencyLimitTokenGroupByJSONString(value)
 	case "RetryTimes":
 		common.RetryTimes, _ = strconv.Atoi(value)
 	case "DataExportInterval":
@@ -463,7 +477,9 @@ func updateOptionMap(key string, value string) (err error) {
 		common.OptionKeySubscriptionExpiryNoticeDays,
 		common.OptionKeySubscriptionMaxPerUser,
 		common.OptionKeySubscriptionQuotaLowThreshold,
-		common.OptionKeySubscriptionV2Enabled:
+		common.OptionKeySubscriptionV2Enabled,
+		common.OptionKeySubscriptionGrayscaleThreshold,
+		common.OptionKeySubscriptionGrayscaleMode:
 		common.UpdateSubscriptionConfig(key, value)
 	}
 	return err

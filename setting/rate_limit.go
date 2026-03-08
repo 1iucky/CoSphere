@@ -9,11 +9,18 @@ import (
 	"github.com/QuantumNous/new-api/common"
 )
 
+// 速率限制粒度常量
+const (
+	RateLimitScopeUser  = "user"  // 用户粒度：同一用户所有令牌共享配额
+	RateLimitScopeToken = "token" // 令牌粒度���每个令牌独立计算配额
+)
+
 var ModelRequestRateLimitEnabled = false
 var ModelRequestRateLimitDurationMinutes = 1
 var ModelRequestRateLimitCount = 0
 var ModelRequestRateLimitSuccessCount = 1000
 var ModelRequestRateLimitGroup = map[string][2]int{}
+var ModelRequestRateLimitScope = RateLimitScopeUser // 默认用户粒度
 var ModelRequestRateLimitMutex sync.RWMutex
 
 func ModelRequestRateLimitGroup2JSONString() string {

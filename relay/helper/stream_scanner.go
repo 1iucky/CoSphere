@@ -98,6 +98,8 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 	scanner.Buffer(make([]byte, InitialScannerBufferSize), MaxScannerBufferSize)
 	scanner.Split(bufio.ScanLines)
 	SetEventStreamHeaders(c)
+	// 设置计费响应头（包含 billing_source 和 skip_reason）
+	SetBillingHeaders(c, info.BillingSource, info.BillingSkipReason)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

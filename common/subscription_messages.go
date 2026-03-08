@@ -6,6 +6,7 @@ const (
 	MsgSubscriptionExpired             = "订阅已过期"
 	MsgSubscriptionNotActive           = "订阅未激活"
 	MsgSubscriptionLimitReached        = "订阅额度已达上限"
+	MsgSubscriptionLimitReachedHint    = "您可以在设置中启用自动余额兜底功能"
 	MsgSubscriptionQuotaExhausted      = "订阅额度已用完"
 	MsgSubscriptionConflict            = "订阅冲突，同一时间只能有一个生效的订阅"
 	MsgSubscriptionCancelled           = "订阅已取消"

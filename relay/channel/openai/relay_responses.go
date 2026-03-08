@@ -40,6 +40,9 @@ func OaiResponsesHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 		c.Set("image_generation_call_size", responsesResponse.GetSize())
 	}
 
+	// 设置计费响应头（包含 billing_source 和 skip_reason）
+	helper.SetBillingHeaders(c, info.BillingSource, info.BillingSkipReason)
+
 	// 写入新的 response body
 	service.IOCopyBytesGracefully(c, resp, responseBody)
 

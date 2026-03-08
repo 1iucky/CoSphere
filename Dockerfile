@@ -1,7 +1,8 @@
 # ============================================
 # Stage 1: 前端构建
 # ============================================
-FROM oven/bun:latest AS frontend-builder
+# 使用阿里云镜像加速
+FROM m.daocloud.io/docker.io/oven/bun:latest AS frontend-builder
 
 WORKDIR /build
 
@@ -24,7 +25,7 @@ RUN DISABLE_ESLINT_PLUGIN='true' \
 # ============================================
 # Stage 2: Go 依赖下载（独立阶段，最大化缓存利用）
 # ============================================
-FROM golang:alpine AS go-deps
+FROM m.daocloud.io/docker.io/library/golang:alpine AS go-deps
 
 WORKDIR /build
 
@@ -41,7 +42,7 @@ RUN go mod download
 # ============================================
 # Stage 3: Go 编译
 # ============================================
-FROM golang:alpine AS backend-builder
+FROM m.daocloud.io/docker.io/library/golang:alpine AS backend-builder
 
 ENV GO111MODULE=on CGO_ENABLED=0
 ENV GOPROXY=https://goproxy.cn,direct
@@ -68,9 +69,11 @@ RUN go build -ldflags "-s -w -X 'github.com/QuantumNous/new-api/common.Version=$
 # ============================================
 # Stage 4: 最终镜像（最小化）
 # ============================================
-FROM alpine:latest
+FROM m.daocloud.io/docker.io/library/alpine:latest
 
-RUN apk upgrade --no-cache \
+# 使用阿里云 APK 源加速
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
+    && apk upgrade --no-cache \
     && apk add --no-cache ca-certificates tzdata \
     && update-ca-certificates
 

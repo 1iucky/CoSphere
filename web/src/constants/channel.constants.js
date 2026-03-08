@@ -89,6 +89,21 @@ export const CHANNEL_OPTIONS = [
     label: '智谱 GLM-4V',
   },
   {
+    value: 57,
+    color: 'indigo',
+    label: '智谱 Coding',
+  },
+  {
+    value: 58,
+    color: 'cyan',
+    label: '千问 Coding',
+  },
+  {
+    value: 59,
+    color: 'teal',
+    label: 'MiniMax Coding',
+  },
+  {
     value: 27,
     color: 'blue',
     label: 'Perplexity',

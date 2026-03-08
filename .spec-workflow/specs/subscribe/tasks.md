@@ -653,37 +653,37 @@
   - 响应中包含计费提示信息
 
 #### 3.2 Feature Flag 配置
-- [ ] 3.2.1 实现 feature flag 控制
+- [x] 3.2.1 实现 feature flag 控制
   - 配置项：`SUBSCRIPTION_V2_ENABLED`
   - 支持按用户ID灰度（user_id % 100 < threshold）
   - 支持按百分比灰度
-- [ ] 3.2.2 准备灰度切换脚本
+- [x] 3.2.2 准备灰度切换脚本
   - 开启灰度脚本（1% → 10% → 50% → 100%）
   - 关闭 flag 快速回退脚本
-- [ ] 3.2.3 缓存/迁移联动
+- [x] 3.2.3 缓存/迁移联动
   - flag 开启时刷新相关缓存
   - flag 关闭时回退到旧逻辑
 
 #### 3.3 改造预扣费逻辑
-- [ ] 3.3.1 改造 `service/pre_consume_quota.go`
+- [x] 3.3.1 改造 `service/pre_consume_quota.go`
   - 检查 feature flag，决定是否启用订阅扣费
   - 调用 `subscription_billing.SelectCandidateSubscriptions`
   - 筛选可用订阅列表
-- [ ] 3.3.2 接入订阅判定逻辑
+- [x] 3.3.2 接入订阅判定逻辑
   - 调用 `subscription_billing.TryDeductFromSubscriptions`
   - 按优先级遍历订阅并预扣
   - 成功：记录 `BillingSource=subscription`
-- [ ] 3.3.3 处理订阅额度不足
+- [x] 3.3.3 处理订阅额度不足
   - 返回新错误码：`SUBSCRIPTION_LIMIT_REACHED`
   - 检查 `auto_wallet_fallback` 配置
   - fallback=true：切换到余额扣费
   - fallback=false：返回错误给用户
-- [ ] 3.3.4 处理订阅优先关闭
+- [x] 3.3.4 处理订阅优先关闭
   - 检查 `token.subscription_preferred`
   - 如果为 false，跳过订阅判定
   - 设置 `SkipReason=subscription_preferred_disabled`
   - 在响应中添加提示字段
-- [ ] 3.3.5 性能优化
+- [x] 3.3.5 性能优化
   - 添加性能监控埋点（订阅判定耗时）
   - 优化订阅筛选查询（SQL优化 + 索引）
   - 优化缓存策略（预热、TTL调优）

@@ -247,7 +247,59 @@ func InitLogDB() (err error) {
 	return err
 }
 
+// preMigratePrefillGroupIndex 处理 prefill_groups 表的索引迁移兼容性问题
+// 解决 GORM AutoMigrate 尝试删除不存在的 uni_prefill_groups_name 约束导致的失败
+// 原因：旧版本 DDL 中使用了 uk_prefill_name 和 idx_prefill_groups_name 作为索引名，
+// 而 GORM 默认生成的索引名是 uni_prefill_groups_name，导致迁移时找不到约束
+func preMigratePrefillGroupIndex() error {
+	if !common.UsingPostgreSQL {
+		return nil
+	}
+
+	// 检查 prefill_groups 表是否存在
+	if !DB.Migrator().HasTable(&PrefillGroup{}) {
+		return nil
+	}
+
+	// 需要检查并删除的旧索引列表
+	oldIndexes := []string{"uk_prefill_name", "idx_prefill_groups_name", "uni_prefill_groups_name"}
+
+	for _, indexName := range oldIndexes {
+		var exists bool
+		err := DB.Raw(`
+			SELECT EXISTS (
+				SELECT 1 FROM pg_indexes
+				WHERE tablename = 'prefill_groups'
+				AND indexname = ?
+			)
+		`, indexName).Scan(&exists).Error
+
+		if err != nil {
+			common.SysLog("warning: failed to check index " + indexName + ": " + err.Error())
+			continue
+		}
+
+		if exists {
+			// 删除旧索引，让 GORM AutoMigrate 重新创建正确的索引
+			dropSQL := "DROP INDEX IF EXISTS " + indexName
+			if err := DB.Exec(dropSQL).Error; err != nil {
+				common.SysLog("warning: failed to drop index " + indexName + ": " + err.Error())
+			} else {
+				common.SysLog("dropped old prefill_groups index: " + indexName)
+			}
+		}
+	}
+
+	return nil
+}
+
 func migrateDB() error {
+	// 预迁移处理：解决 prefill_groups 表索引命名不一致导致的 GORM AutoMigrate 失败问题
+	if err := preMigratePrefillGroupIndex(); err != nil {
+		common.SysLog("warning: pre-migrate prefill_groups index failed: " + err.Error())
+		// 不返回错误，继续执行后续迁移
+	}
+
 	err := DB.AutoMigrate(
 		&Channel{},
 		&Token{},
@@ -318,7 +370,7 @@ func initializeDataIfNeeded() error {
 // 此方法在 OptionMap 初始化前调用，用于数据库迁移阶段的配置读取
 func getAutoWalletFallbackDefaultFromDB() bool {
 	var option Option
-	err := DB.Where("`key` = ?", common.OptionKeySubscriptionAutoWalletDefault).First(&option).Error
+	err := DB.Where(commonKeyCol+" = ?", common.OptionKeySubscriptionAutoWalletDefault).First(&option).Error
 
 	if err != nil {
 		// 如果查询失败或未配置，使用代码默认值
@@ -337,6 +389,11 @@ func getAutoWalletFallbackDefaultFromDB() bool {
 }
 
 func migrateDBFast() error {
+	// 预迁移处理：解决 prefill_groups 表索引命名不一致导致的 GORM AutoMigrate 失败问题
+	if err := preMigratePrefillGroupIndex(); err != nil {
+		common.SysLog("warning: pre-migrate prefill_groups index failed: " + err.Error())
+		// 不返回错误，继续执行后续迁移
+	}
 
 	var wg sync.WaitGroup
 

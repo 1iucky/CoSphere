@@ -764,6 +764,9 @@ func HandleClaudeResponseData(c *gin.Context, info *relaycommon.RelayInfo, claud
 		c.Set("claude_web_search_requests", claudeResponse.Usage.ServerToolUse.WebSearchRequests)
 	}
 
+	// 设置计费响应头（包含 billing_source 和 skip_reason）
+	helper.SetBillingHeaders(c, info.BillingSource, info.BillingSkipReason)
+
 	service.IOCopyBytesGracefully(c, httpResp, responseData)
 	return nil
 }

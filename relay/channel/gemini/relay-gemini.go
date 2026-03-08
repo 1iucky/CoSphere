@@ -1168,6 +1168,9 @@ func GeminiChatHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.R
 		break
 	}
 
+	// 设置计费响应头（包含 billing_source 和 skip_reason）
+	helper.SetBillingHeaders(c, info.BillingSource, info.BillingSkipReason)
+
 	service.IOCopyBytesGracefully(c, resp, responseBody)
 
 	return &usage, nil
@@ -1218,6 +1221,9 @@ func GeminiEmbeddingHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *h
 		return nil, types.NewOpenAIError(jsonErr, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
 	}
 
+	// 设置计费响应头（包含 billing_source 和 skip_reason）
+	helper.SetBillingHeaders(c, info.BillingSource, info.BillingSkipReason)
+
 	service.IOCopyBytesGracefully(c, resp, jsonResponse)
 	return usage, nil
 }
@@ -1259,6 +1265,8 @@ func GeminiImageHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.
 	}
 
 	c.Writer.Header().Set("Content-Type", "application/json")
+	// 设置计费响应头（包含 billing_source 和 skip_reason）
+	helper.SetBillingHeaders(c, info.BillingSource, info.BillingSkipReason)
 	c.Writer.WriteHeader(resp.StatusCode)
 	_, _ = c.Writer.Write(jsonResponse)
 
@@ -1331,6 +1339,8 @@ func ChatImageHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 	}
 
 	c.Writer.Header().Set("Content-Type", "application/json")
+	// 设置计费响应头（包含 billing_source 和 skip_reason）
+	helper.SetBillingHeaders(c, info.BillingSource, info.BillingSkipReason)
 	c.Writer.WriteHeader(resp.StatusCode)
 	_, _ = c.Writer.Write(jsonResponse)
 

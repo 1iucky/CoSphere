@@ -58,17 +58,18 @@ const (
 
 // BillingContext 计费上下文（贯穿整个请求生命周期）
 type BillingContext struct {
-	UserId            int64                  `json:"user_id"`
-	TokenId           int                    `json:"token_id"`
-	ModelName         string                 `json:"model_name"`
-	ChannelGroup      string                 `json:"channel_group"`
-	Source            string                 `json:"source"`              // 计费来源
-	SubscriptionId    int64                  `json:"subscription_id"`     // 使用的订阅 ID（如果有）
-	PreConsumeContext *PreConsumeContext     `json:"pre_consume_context"` // 预扣上下文
-	FallbackReason    string                 `json:"fallback_reason"`     // 兜底原因
-	SkipReason        string                 `json:"skip_reason"`         // 跳过原因
-	AutoWalletEnabled bool                   `json:"auto_wallet_enabled"` // 是否启用自动兜底
-	Metadata          map[string]interface{} `json:"metadata"`            // 额外元数据
+	UserId            int64                    `json:"user_id"`
+	TokenId           int                      `json:"token_id"`
+	ModelName         string                   `json:"model_name"`
+	ChannelGroup      string                   `json:"channel_group"`
+	Source            string                   `json:"source"`              // 计费来源
+	SubscriptionId    int64                    `json:"subscription_id"`     // 使用的订阅 ID（如果有）
+	PreConsumeContext *PreConsumeContext       `json:"pre_consume_context"` // 预扣上下文
+	FallbackReason    string                   `json:"fallback_reason"`     // 兜底原因
+	SkipReason        string                   `json:"skip_reason"`         // 跳过原因
+	AutoWalletEnabled bool                     `json:"auto_wallet_enabled"` // 是否启用自动兜底
+	Metadata          map[string]interface{}   `json:"metadata"`            // 额外元数据
+	Candidates        []*CandidateSubscription `json:"-"`                   // 候选订阅（内部使用，避免重复筛选）
 }
 
 // CandidateSubscription 候选订阅（用于筛选）
@@ -275,6 +276,8 @@ func (s *SubscriptionBillingService) TryDeductFromSubscriptions(
 		return nil, errors.New("预扣额度必须为正数")
 	}
 
+	// 遍历候选订阅，按优先级顺序
+
 	// 按优先级遍历（candidates 已按优先级排序）
 	for _, candidate := range candidates {
 		sub := candidate.Subscription
@@ -295,15 +298,18 @@ func (s *SubscriptionBillingService) TryDeductFromSubscriptions(
 		}
 
 		if len(periodConfigs) == 0 {
+			// 无启用限额，跳过此订阅
 			continue
 		}
 
-		// 尝试预扣（使用支持每周期不同策略的方法）
+		// 尛试预扣（使用支持每周期不同策略的方法）
 		preConsumeCtx, err := s.usageService.TryPreConsumeWithStrategies(sub.Id, amount, periodConfigs)
 		if err != nil {
 			// 额度不足则尝试下一个订阅，系统异常则直接返回
 			if apiErr, ok := err.(*types.NewAPIError); ok {
 				if apiErr.GetErrorCode() == types.ErrorCodeUsageQuotaExceeded {
+					// 额度不足，尝试下一个订阅
+					// details 应该反映"决策订阅"的配置，在 TryBilling 中统一构造
 					continue
 				}
 				return nil, apiErr
@@ -328,10 +334,16 @@ func (s *SubscriptionBillingService) TryDeductFromSubscriptions(
 	}
 
 	// 所有订阅都预扣失败
+	// 简化错误返回：不在此处构造 details
+	// details 应该反映"决策订阅"的配置，由 TryBilling 统一构造
+	errOpts := []types.NewAPIErrorOptions{
+		types.ErrOptionWithHint(common.MsgSubscriptionLimitReachedHint),
+	}
 	return nil, types.NewErrorWithStatusCode(
 		errors.New(common.MsgSubscriptionLimitReached),
 		types.ErrorCodeSubscriptionLimitReached,
 		http.StatusTooManyRequests,
+		errOpts...,
 	)
 }
 
@@ -473,7 +485,8 @@ func (s *SubscriptionBillingService) SelectCandidate(
 		return ctx, nil
 	}
 
-	// 3. 存储候选订阅到上下文
+	// 3. 存储候选订阅到上下文（避免 TryBilling 重复筛选）
+	ctx.Candidates = candidates
 	ctx.Metadata["candidate_count"] = len(candidates)
 
 	return ctx, nil
@@ -502,17 +515,20 @@ func (s *SubscriptionBillingService) TryBilling(
 		return result, nil
 	}
 
-	// 从 relayInfo 获取 token 的订阅偏好设置
-	tokenSubscriptionPreferred := false // 默认不启用订阅优先
-	if relayInfo != nil {
-		tokenSubscriptionPreferred = relayInfo.TokenSubscriptionPreferred
-	}
-
-	// 获取候选订阅
-	candidates, err := s.SelectCandidateSubscriptions(ctx.UserId, ctx.ModelName, ctx.ChannelGroup, tokenSubscriptionPreferred)
-	if err != nil {
-		result.ErrorMessage = err.Error()
-		return result, err
+	// 优先使用上下文中的候选订阅（避免重复筛选）
+	candidates := ctx.Candidates
+	if len(candidates) == 0 {
+		// 如果上下文中没有候选订阅，回退到重新筛选（兼容旧调用方式）
+		tokenSubscriptionPreferred := false
+		if relayInfo != nil {
+			tokenSubscriptionPreferred = relayInfo.TokenSubscriptionPreferred
+		}
+		var err error
+		candidates, err = s.SelectCandidateSubscriptions(ctx.UserId, ctx.ModelName, ctx.ChannelGroup, tokenSubscriptionPreferred)
+		if err != nil {
+			result.ErrorMessage = err.Error()
+			return result, err
+		}
 	}
 
 	if len(candidates) == 0 {
@@ -525,25 +541,73 @@ func (s *SubscriptionBillingService) TryBilling(
 	// 尝试从订阅预扣
 	billingCtx, err := s.TryDeductFromSubscriptions(candidates, amount)
 	if err != nil {
-		// 预扣失败，检查自动兜底
-		autoWallet := false
-		if len(candidates) > 0 && candidates[0].Subscription != nil {
-			// 优先使用最高优先级订阅的兜底开关
-			autoWallet = candidates[0].Subscription.AutoWalletFallback
-		} else {
-			autoWallet, _ = s.CheckAutoWalletFallback(ctx.UserId, 0)
-		}
-		if autoWallet {
-			// 启用兜底，切换到钱包
-			ctx = s.FallbackToWallet(ctx, err.Error())
-			_ = s.RecordFallbackEvent(ctx, relayInfo)
-			result.Success = true
-			result.Source = BillingSourceFallback
-			result.Context = ctx
-			return result, nil
+		// 判断是否为订阅额度不足错误（仅此情况才允许兜底）
+		isLimitReachedError := false
+		if apiErr, ok := err.(*types.NewAPIError); ok {
+			isLimitReachedError = apiErr.GetErrorCode() == types.ErrorCodeSubscriptionLimitReached
 		}
 
-		// 未启用兜底，返回错误
+		// 只有订阅额度不足才检查自动兜底，系统/DB 错误直接返回
+		if isLimitReachedError {
+			autoWallet := false
+			var decisionSub *model.Subscription
+			if len(candidates) > 0 && candidates[0].Subscription != nil {
+				// 使用最高优先级订阅作为决策订阅
+				decisionSub = candidates[0].Subscription
+				autoWallet = decisionSub.AutoWalletFallback
+			} else {
+				autoWallet, _ = s.CheckAutoWalletFallback(ctx.UserId, 0)
+			}
+			if autoWallet {
+				// 启用兜底，切换到钱包
+				ctx = s.FallbackToWallet(ctx, err.Error())
+				_ = s.RecordFallbackEvent(ctx, relayInfo)
+				result.Success = true
+				result.Source = BillingSourceFallback
+				result.Context = ctx
+				return result, nil
+			}
+
+			// 未启用兜底：构造 details，反映"决策订阅"的配置
+			// 只有 auto_wallet_fallback=false 时才会返回此错误
+			if decisionSub != nil {
+				// 找到决策订阅的首个启用的限额配置
+				var enabledLimit *model.SubscriptionPlanLimit
+				for _, limit := range candidates[0].Limits {
+					if limit.Enabled {
+						enabledLimit = &limit
+						break
+					}
+				}
+
+				// 构造 details：所有字段都来自决策订阅，保持语义一致性
+				details := map[string]interface{}{
+					"subscription_id":      decisionSub.Id,
+					"requested":            amount,
+					"auto_wallet_fallback": decisionSub.AutoWalletFallback, // 应为 false（因为未启用兜底）
+				}
+
+				if enabledLimit != nil {
+					// 有启用限额：填充限额详情
+					details["period"] = enabledLimit.Period
+					details["limit_quota"] = enabledLimit.Quota
+					details["used_quota"] = int64(0) // TryPreConsumeWithStrategies 未返回 used_quota
+				} else {
+					// 无启用限额：使用占位字段
+					details["period"] = "none" // 明确标识为"无启用限额"
+					details["limit_quota"] = int64(0)
+					details["used_quota"] = int64(0)
+				}
+
+				// 构造带 details 的错误
+				if apiErr, ok := err.(*types.NewAPIError); ok && apiErr.Details == nil {
+					apiErr.Details = details
+					err = apiErr
+				}
+			}
+		}
+
+		// 未启用兜底或非额度不足错误，返回错误
 		result.ErrorMessage = err.Error()
 		return result, err
 	}
@@ -599,4 +663,106 @@ func (s *SubscriptionBillingService) PostBilling(
 	// diff > 0: 补扣（实际消耗大于预扣）
 	// diff < 0: 返还（实际消耗小于预扣）
 	return s.usageService.AdjustUsage(ctx.PreConsumeContext.ContextId, actualAmount)
+}
+
+// ===================== 性能监控 =====================
+
+// BillingPerformanceStats 计费性能统计
+type BillingPerformanceStats struct {
+	TotalCount        int64              `json:"total_count"`          // 总请求数
+	TotalDurationMs   float64            `json:"total_duration_ms"`    // 总耗时（毫秒）
+	AvgDurationMs     float64            `json:"avg_duration_ms"`      // 平均耗时（毫秒）
+	MaxDurationMs     float64            `json:"max_duration_ms"`      // 最大耗时（毫秒）
+	MinDurationMs     float64            `json:"min_duration_ms"`      // 最小耗时（毫秒）
+	Over5msCount      int64              `json:"over_5ms_count"`       // 超过 5ms 的请求数
+	Over10msCount     int64              `json:"over_10ms_count"`      // 超过 10ms 的请求数
+	BySource          map[string]int64   `json:"by_source"`            // 按来源统计
+	BySourceDuration  map[string]float64 `json:"by_source_duration"`   // 按来源累计耗时
+}
+
+var (
+	billingPerfStats     BillingPerformanceStats
+	billingPerfStatsLock sync.RWMutex
+)
+
+func init() {
+	billingPerfStats = BillingPerformanceStats{
+		MinDurationMs:    -1, // -1 表示未初始化
+		BySource:         make(map[string]int64),
+		BySourceDuration: make(map[string]float64),
+	}
+}
+
+// RecordBillingDuration 记录计费耗时
+// 用于收集性能统计数据，便于监控和优化
+func (s *SubscriptionBillingService) RecordBillingDuration(durationMs float64, source string) {
+	billingPerfStatsLock.Lock()
+	defer billingPerfStatsLock.Unlock()
+
+	billingPerfStats.TotalCount++
+	billingPerfStats.TotalDurationMs += durationMs
+
+	// 更新最大/最小值
+	if durationMs > billingPerfStats.MaxDurationMs {
+		billingPerfStats.MaxDurationMs = durationMs
+	}
+	if billingPerfStats.MinDurationMs < 0 || durationMs < billingPerfStats.MinDurationMs {
+		billingPerfStats.MinDurationMs = durationMs
+	}
+
+	// 统计超时请求
+	if durationMs > 5 {
+		billingPerfStats.Over5msCount++
+	}
+	if durationMs > 10 {
+		billingPerfStats.Over10msCount++
+	}
+
+	// 按来源统计
+	billingPerfStats.BySource[source]++
+	billingPerfStats.BySourceDuration[source] += durationMs
+}
+
+// GetBillingPerformanceStats 获取计费性能统计
+func (s *SubscriptionBillingService) GetBillingPerformanceStats() BillingPerformanceStats {
+	billingPerfStatsLock.RLock()
+	defer billingPerfStatsLock.RUnlock()
+
+	stats := BillingPerformanceStats{
+		TotalCount:       billingPerfStats.TotalCount,
+		TotalDurationMs:  billingPerfStats.TotalDurationMs,
+		MaxDurationMs:    billingPerfStats.MaxDurationMs,
+		MinDurationMs:    billingPerfStats.MinDurationMs,
+		Over5msCount:     billingPerfStats.Over5msCount,
+		Over10msCount:    billingPerfStats.Over10msCount,
+		BySource:         make(map[string]int64),
+		BySourceDuration: make(map[string]float64),
+	}
+
+	// 计算平均耗时
+	if stats.TotalCount > 0 {
+		stats.AvgDurationMs = stats.TotalDurationMs / float64(stats.TotalCount)
+	}
+
+	// 复制 map 数据
+	for k, v := range billingPerfStats.BySource {
+		stats.BySource[k] = v
+	}
+	for k, v := range billingPerfStats.BySourceDuration {
+		stats.BySourceDuration[k] = v
+	}
+
+	return stats
+}
+
+// ResetBillingPerformanceStats 重置计费性能统计（用于测试或定期重置）
+func (s *SubscriptionBillingService) ResetBillingPerformanceStats() {
+	billingPerfStatsLock.Lock()
+	defer billingPerfStatsLock.Unlock()
+
+	billingPerfStats = BillingPerformanceStats{
+		MinDurationMs:    -1,
+		BySource:         make(map[string]int64),
+		BySourceDuration: make(map[string]float64),
+	}
 }

@@ -390,7 +390,7 @@
   - 若令牌 `subscription_preferred = false`，即使用户有生效订阅，也跳过订阅扣费
   - 订阅筛选不依赖令牌分组，渠道匹配以订阅绑定分组为准
   - 令牌分组（含多分组优先级）仅用于余额路径
-  - 前端响应中需包含提示字段 `skip_reason`（如 `subscription_preferred_disabled`）
+  - 通过 HTTP 响应头 `X-New-Api-Billing-Source` 和 `X-New-Api-Billing-Skip-Reason` 向调用方提示计费信息，不影响 OpenAI 格式兼容性
 - **迁移策略**: 保留原有字段含义，新增订阅优先字段，不影响自动分组
 
 **影响范围**:

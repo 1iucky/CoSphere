@@ -45,6 +45,20 @@ export function getAssetUrl(path) {
   return `${basePath}${cleanPath}`;
 }
 
+/**
+ * 获取应用内路径的完整 URL（自动添加 base 前缀）
+ * @param {string} path - 应用内路径，如 '/login' 或 'login?expired=true'
+ * @returns {string} 带 base 前缀的完整路径
+ */
+export function getAppUrl(path = '/') {
+  const basePath = import.meta.env.BASE_URL || '/';
+  const normalizedBase = basePath.endsWith('/')
+    ? basePath.slice(0, -1)
+    : basePath;
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${normalizedBase}${normalizedPath}`;
+}
+
 export function isAdmin() {
   let user = localStorage.getItem('user');
   if (!user) return false;
@@ -154,7 +168,7 @@ export function showError(error) {
           // 清除用户状态
           localStorage.removeItem('user');
           // toast.error('错误：未登录或登录已过期，请重新登录！', showErrorOptions);
-          window.location.href = '/login?expired=true';
+          window.location.href = getAppUrl('/login?expired=true');
           break;
         case 429:
           Toast.error('错误：请求次数过多，请稍后再试！');

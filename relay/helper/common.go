@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/types"
@@ -39,6 +40,57 @@ func SetEventStreamHeaders(c *gin.Context) {
 	c.Writer.Header().Set("Connection", "keep-alive")
 	c.Writer.Header().Set("Transfer-Encoding", "chunked")
 	c.Writer.Header().Set("X-Accel-Buffering", "no")
+
+	// 流式响应统一设置计费头（从 context 读取）
+	SetBillingHeaders(c, "", "")
+}
+
+// SetBillingHeaders 设置计费相关的响应头
+// 响应头名称：
+//   - X-New-Api-Billing-Source: 计费来源（subscription/wallet/fallback/skipped）
+//   - X-New-Api-Billing-Skip-Reason: 跳过订阅扣费的原因（仅当跳过时设置）
+//
+// 这些响应头用于向调用方提示计费信息，不会影响 OpenAI 格式的兼容性
+// 如果传入参数为空，会尝试从 context 读取 billing 信息
+func SetBillingHeaders(c *gin.Context, billingSource, skipReason string) {
+	// 检查是否已经设置过计费响应头
+	if _, exists := c.Get("billing_headers_set"); exists {
+		return
+	}
+
+	// 如果传入参数为空，尝试从 context 读取
+	if billingSource == "" {
+		if source, exists := c.Get(string(constant.ContextKeyBillingSource)); exists {
+			if s, ok := source.(string); ok {
+				billingSource = s
+			}
+		}
+	}
+	if skipReason == "" {
+		if reason, exists := c.Get(string(constant.ContextKeyBillingSkipReason)); exists {
+			if r, ok := reason.(string); ok {
+				skipReason = r
+			}
+		}
+	}
+
+	// 如果没有 billing 信息，不设置响应头
+	if billingSource == "" && skipReason == "" {
+		return
+	}
+
+	// 设置标志，表示计费响应头已经设置过
+	c.Set("billing_headers_set", true)
+
+	// 设置计费来源响应头
+	if billingSource != "" {
+		c.Writer.Header().Set("X-New-Api-Billing-Source", billingSource)
+	}
+
+	// 设置跳过原因响应头（仅当有跳过原因时）
+	if skipReason != "" {
+		c.Writer.Header().Set("X-New-Api-Billing-Skip-Reason", skipReason)
+	}
 }
 
 func ClaudeData(c *gin.Context, resp dto.ClaudeResponse) error {

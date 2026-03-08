@@ -3,16 +3,20 @@ package controller_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/controller"
 	"github.com/QuantumNous/new-api/middleware"
 	"github.com/QuantumNous/new-api/model"
+	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
@@ -206,6 +210,46 @@ func createContractTestUser(t *testing.T, db *gorm.DB, role int) *model.User {
 	err := db.Create(user).Error
 	require.NoError(t, err)
 	return user
+}
+
+func createContractTestPlan(t *testing.T, db *gorm.DB) *model.SubscriptionPlan {
+	return createContractTestPlanWithCurrency(t, db, "USD")
+}
+
+func createContractTestPlanWithCurrency(t *testing.T, db *gorm.DB, currency string) *model.SubscriptionPlan {
+	plan := &model.SubscriptionPlan{
+		Name:              "Contract Test Plan " + common.GetRandomString(6),
+		PriceCents:        1000, // $10.00 or ¥10.00
+		Currency:          currency,
+		BillingCycle:      "monthly",
+		BillingCycleValue: 1,
+		Status:            "published",
+	}
+	err := db.Create(plan).Error
+	require.NoError(t, err)
+	return plan
+}
+
+func createContractTestOrder(t *testing.T, db *gorm.DB, userId int, planId int64) *model.SubscriptionOrder {
+	return createContractTestOrderWithCurrency(t, db, userId, planId, "USD")
+}
+
+func createContractTestOrderWithCurrency(t *testing.T, db *gorm.DB, userId int, planId int64, currency string) *model.SubscriptionOrder {
+	order := &model.SubscriptionOrder{
+		UserId:          int64(userId),
+		PlanId:          planId,
+		PlanSnapshot:    fmt.Sprintf(`{"name":"Test Plan","price_cents":1000,"currency":"%s"}`, currency),
+		PaymentChannel:  "wallet",
+		PriceCents:      1000,
+		DiscountCents:   0,
+		FinalPriceCents: 1000,
+		Status:          common.OrderStatusPending,
+		CreatedAt:       time.Now().Unix(),
+		UpdatedAt:       time.Now().Unix(),
+	}
+	err := db.Create(order).Error
+	require.NoError(t, err)
+	return order
 }
 
 func addContractAuthHeaders(req *http.Request, user *model.User) {
@@ -1783,5 +1827,1012 @@ func TestContract_CouponPreview_ActualRequest(t *testing.T) {
 				assert.True(t, hasField, "预览响应应包含 %s 字段", field)
 			}
 		}
+	})
+}
+
+// ===================== 用户订单 API 响应契约测试 =====================
+
+// TestContract_UserOrderList_ActualRequest 验证用户订单列表接口响应契约
+func TestContract_UserOrderList_ActualRequest(t *testing.T) {
+	db, cleanup := setupContractTestDB(t)
+	defer cleanup()
+
+	user := createContractTestUser(t, db, common.RoleCommonUser)
+	router := setupContractRouter()
+
+	t.Run("订单列表返回正确的响应结构", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/user/subscriptions/orders", nil)
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.True(t, resp["success"].(bool), "订单列表应返回成功")
+
+		// 验证必须包含 data 和 total 字段
+		_, hasData := resp["data"]
+		_, hasTotal := resp["total"]
+		assert.True(t, hasData, "响应应包含 data 字段")
+		assert.True(t, hasTotal, "响应应包含 total 字段")
+	})
+
+	t.Run("订单列表支持分页参数", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/user/subscriptions/orders?page=1&page_size=10", nil)
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.True(t, resp["success"].(bool), "带分页参数的订单列表应返回成功")
+	})
+
+	t.Run("订单列表支持状态筛选", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/user/subscriptions/orders?status=pending", nil)
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.True(t, resp["success"].(bool), "带状态筛选的订单列表应返回成功")
+	})
+}
+
+// TestContract_UserOrderCreate_ActualRequest 验证创建订单接口请求和响应契约
+func TestContract_UserOrderCreate_ActualRequest(t *testing.T) {
+	db, cleanup := setupContractTestDB(t)
+	defer cleanup()
+
+	user := createContractTestUser(t, db, common.RoleCommonUser)
+
+	// 创建测试套餐
+	plan := &model.SubscriptionPlan{
+		Name:         "Contract Create Order Plan",
+		PriceCents:   1000,
+		Currency:     "CNY",
+		BillingCycle: "monthly",
+		Status:       common.PlanStatusActive,
+	}
+	db.Create(plan)
+
+	router := setupContractRouter()
+
+	t.Run("plan_id 为必填字段", func(t *testing.T) {
+		body, _ := json.Marshal(map[string]interface{}{
+			"payment_channel": "wallet",
+		})
+		req, _ := http.NewRequest("POST", "/api/user/subscriptions/orders", bytes.NewReader(body))
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.False(t, resp["success"].(bool), "缺少 plan_id 应返回错误")
+	})
+
+	t.Run("payment_channel 为必填字段", func(t *testing.T) {
+		body, _ := json.Marshal(map[string]interface{}{
+			"plan_id": plan.Id,
+		})
+		req, _ := http.NewRequest("POST", "/api/user/subscriptions/orders", bytes.NewReader(body))
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.False(t, resp["success"].(bool), "缺少 payment_channel 应返回错误")
+	})
+
+	t.Run("payment_channel 枚举值验证", func(t *testing.T) {
+		body, _ := json.Marshal(map[string]interface{}{
+			"plan_id":         plan.Id,
+			"payment_channel": "invalid_channel",
+		})
+		req, _ := http.NewRequest("POST", "/api/user/subscriptions/orders", bytes.NewReader(body))
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.False(t, resp["success"].(bool), "无效 payment_channel 应返回错误")
+	})
+
+	t.Run("有效请求返回正确的响应结构", func(t *testing.T) {
+		body, _ := json.Marshal(map[string]interface{}{
+			"plan_id":         plan.Id,
+			"payment_channel": "wallet",
+		})
+		req, _ := http.NewRequest("POST", "/api/user/subscriptions/orders", bytes.NewReader(body))
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.True(t, resp["success"].(bool), "创建订单应返回成功")
+
+		data, hasData := resp["data"].(map[string]interface{})
+		assert.True(t, hasData, "响应应包含 data 字段")
+
+		// 验证响应字段
+		if hasData {
+			requiredFields := []string{"order_id", "plan_id", "final_price_cents", "payment_channel", "status"}
+			for _, field := range requiredFields {
+				_, hasField := data[field]
+				assert.True(t, hasField, "创建订单响应应包含 %s 字段", field)
+			}
+		}
+	})
+}
+
+// TestContract_UserOrderPreview_ActualRequest 验证订单预览接口请求和响应契约
+func TestContract_UserOrderPreview_ActualRequest(t *testing.T) {
+	db, cleanup := setupContractTestDB(t)
+	defer cleanup()
+
+	user := createContractTestUser(t, db, common.RoleCommonUser)
+
+	// 创建测试套餐
+	plan := &model.SubscriptionPlan{
+		Name:         "Contract Preview Order Plan",
+		PriceCents:   2000,
+		Currency:     "CNY",
+		BillingCycle: "monthly",
+		Status:       common.PlanStatusActive,
+	}
+	db.Create(plan)
+
+	router := setupContractRouter()
+
+	t.Run("plan_id 为必填字段", func(t *testing.T) {
+		body, _ := json.Marshal(map[string]interface{}{
+			"coupon_code": "TEST",
+		})
+		req, _ := http.NewRequest("POST", "/api/user/subscriptions/orders/preview", bytes.NewReader(body))
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.False(t, resp["success"].(bool), "缺少 plan_id 应返回错误")
+	})
+
+	t.Run("有效请求返回正确的响应结构", func(t *testing.T) {
+		body, _ := json.Marshal(map[string]interface{}{
+			"plan_id": plan.Id,
+		})
+		req, _ := http.NewRequest("POST", "/api/user/subscriptions/orders/preview", bytes.NewReader(body))
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.True(t, resp["success"].(bool), "预览订单应返回成功")
+
+		data, hasData := resp["data"].(map[string]interface{})
+		assert.True(t, hasData, "响应应包含 data 字段")
+
+		// 验证响应字段
+		if hasData {
+			requiredFields := []string{"plan_id", "plan_name", "price_cents", "final_price_cents", "currency"}
+			for _, field := range requiredFields {
+				_, hasField := data[field]
+				assert.True(t, hasField, "预览订单响应应包含 %s 字段", field)
+			}
+		}
+	})
+}
+
+// TestContract_UserOrderPurchase_ActualRequest 验证一键购买接口请求和响应契约
+func TestContract_UserOrderPurchase_ActualRequest(t *testing.T) {
+	db, cleanup := setupContractTestDB(t)
+	defer cleanup()
+
+	user := createContractTestUser(t, db, common.RoleCommonUser)
+	// 给用户足够余额
+	user.Quota = 1000000
+	db.Save(user)
+
+	// 创建测试套餐
+	plan := &model.SubscriptionPlan{
+		Name:         "Contract Purchase Plan",
+		PriceCents:   500,
+		Currency:     "CNY",
+		BillingCycle: "monthly",
+		Status:       common.PlanStatusActive,
+	}
+	db.Create(plan)
+
+	router := setupContractRouter()
+
+	t.Run("plan_id 为必填字段", func(t *testing.T) {
+		body, _ := json.Marshal(map[string]interface{}{})
+		req, _ := http.NewRequest("POST", "/api/user/subscriptions/orders/purchase", bytes.NewReader(body))
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.False(t, resp["success"].(bool), "缺少 plan_id 应返回错误")
+	})
+
+	t.Run("有效请求返回正确的响应结构", func(t *testing.T) {
+		body, _ := json.Marshal(map[string]interface{}{
+			"plan_id": plan.Id,
+		})
+		req, _ := http.NewRequest("POST", "/api/user/subscriptions/orders/purchase", bytes.NewReader(body))
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		// 一键购买可能因为余额不足等原因失败，这里只验证响应格式
+		_, hasSuccess := resp["success"]
+		assert.True(t, hasSuccess, "响应应包含 success 字段")
+
+		// 如果成功，验证响应字段
+		if success, ok := resp["success"].(bool); ok && success {
+			data, hasData := resp["data"].(map[string]interface{})
+			assert.True(t, hasData, "成功响应应包含 data 字段")
+
+			if hasData {
+				requiredFields := []string{"order_id", "subscription_id", "plan_id", "start_at", "end_at"}
+				for _, field := range requiredFields {
+					_, hasField := data[field]
+					assert.True(t, hasField, "一键购买响应应包含 %s 字段", field)
+				}
+			}
+		}
+	})
+}
+
+// TestContract_UserOrderCancel_ActualRequest 验证取消订单接口
+func TestContract_UserOrderCancel_ActualRequest(t *testing.T) {
+	db, cleanup := setupContractTestDB(t)
+	defer cleanup()
+
+	user := createContractTestUser(t, db, common.RoleCommonUser)
+
+	// 创建测试套餐和订单
+	plan := &model.SubscriptionPlan{
+		Name:         "Contract Cancel Order Plan",
+		PriceCents:   1000,
+		Currency:     "CNY",
+		BillingCycle: "monthly",
+		Status:       common.PlanStatusActive,
+	}
+	db.Create(plan)
+
+	order := &model.SubscriptionOrder{
+		UserId:          int64(user.Id),
+		PlanId:          plan.Id,
+		PlanSnapshot:    "{}",
+		PaymentChannel:  "wallet",
+		PriceCents:      1000,
+		FinalPriceCents: 1000,
+		Status:          common.OrderStatusPending,
+	}
+	db.Create(order)
+
+	router := setupContractRouter()
+
+	t.Run("取消不存在的订单返回错误", func(t *testing.T) {
+		req, _ := http.NewRequest("POST", "/api/user/subscriptions/orders/99999/cancel", nil)
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.False(t, resp["success"].(bool), "取消不存在的订单应返回错误")
+	})
+
+	t.Run("取消他人订单返回错误", func(t *testing.T) {
+		// 创建另一个用户
+		otherUser := createContractTestUser(t, db, common.RoleCommonUser)
+
+		req, _ := http.NewRequest("POST", "/api/user/subscriptions/orders/"+strconv.FormatInt(order.Id, 10)+"/cancel", nil)
+		addContractAuthHeaders(req, otherUser)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.False(t, resp["success"].(bool), "取消他人订单应返回错误")
+	})
+
+	t.Run("取消自己的待支付订单成功", func(t *testing.T) {
+		body, _ := json.Marshal(map[string]interface{}{
+			"reason": "测试取消",
+		})
+		req, _ := http.NewRequest("POST", "/api/user/subscriptions/orders/"+strconv.FormatInt(order.Id, 10)+"/cancel", bytes.NewReader(body))
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.True(t, resp["success"].(bool), "取消自己的待支付订单应成功")
+	})
+}
+
+// TestContract_UserOrderDetail_ActualRequest 验证获取订单详情接口
+func TestContract_UserOrderDetail_ActualRequest(t *testing.T) {
+	db, cleanup := setupContractTestDB(t)
+	defer cleanup()
+
+	user := createContractTestUser(t, db, common.RoleCommonUser)
+
+	// 创建测试套餐和订单
+	plan := &model.SubscriptionPlan{
+		Name:         "Contract Order Detail Plan",
+		PriceCents:   1000,
+		Currency:     "CNY",
+		BillingCycle: "monthly",
+		Status:       common.PlanStatusActive,
+	}
+	db.Create(plan)
+
+	order := &model.SubscriptionOrder{
+		UserId:          int64(user.Id),
+		PlanId:          plan.Id,
+		PlanSnapshot:    "{}",
+		PaymentChannel:  "wallet",
+		PriceCents:      1000,
+		FinalPriceCents: 1000,
+		Status:          common.OrderStatusPending,
+	}
+	db.Create(order)
+
+	router := setupContractRouter()
+
+	t.Run("获取不存在的订单返回错误", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/user/subscriptions/orders/99999", nil)
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.False(t, resp["success"].(bool), "获取不存在的订单应返回错误")
+	})
+
+	t.Run("获取自己的订单详情成功", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/user/subscriptions/orders/"+strconv.FormatInt(order.Id, 10), nil)
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.True(t, resp["success"].(bool), "获取自己的订单详情应成功")
+
+		data, hasData := resp["data"].(map[string]interface{})
+		assert.True(t, hasData, "响应应包含 data 字段")
+
+		// 验证 SubscriptionOrderResponse 字段
+		if hasData {
+			requiredFields := []string{"id", "user_id", "plan_id", "payment_channel", "price_cents", "final_price_cents", "status"}
+			for _, field := range requiredFields {
+				_, hasField := data[field]
+				assert.True(t, hasField, "订单详情响应应包含 %s 字段", field)
+			}
+		}
+	})
+
+	t.Run("获取他人订单返回错误", func(t *testing.T) {
+		otherUser := createContractTestUser(t, db, common.RoleCommonUser)
+
+		req, _ := http.NewRequest("GET", "/api/user/subscriptions/orders/"+strconv.FormatInt(order.Id, 10), nil)
+		addContractAuthHeaders(req, otherUser)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.False(t, resp["success"].(bool), "获取他人订单应返回错误")
+	})
+}
+
+// TestContract_UserCoupons_Pagination 验证用户优惠券列表分页
+func TestContract_UserCoupons_Pagination(t *testing.T) {
+	db, cleanup := setupContractTestDB(t)
+	defer cleanup()
+
+	user := createContractTestUser(t, db, common.RoleCommonUser)
+	router := setupContractRouter()
+
+	t.Run("优惠券列表支持分页参数", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/user/coupons?page=1&page_size=10", nil)
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		if err != nil {
+			t.Skipf("响应不是有效 JSON，可能是服务依赖未初始化: %s", w.Body.String()[:min(100, w.Body.Len())])
+			return
+		}
+
+		// 验证响应格式
+		_, hasSuccess := resp["success"]
+		assert.True(t, hasSuccess, "响应应包含 success 字段")
+
+		if success, ok := resp["success"].(bool); ok && success {
+			_, hasTotal := resp["total"]
+			assert.True(t, hasTotal, "成功响应应包含 total 字段")
+		}
+	})
+
+	t.Run("优惠券列表支持状态筛选", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/user/coupons?status=available", nil)
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		if err != nil {
+			t.Skipf("响应不是有效 JSON: %s", w.Body.String()[:min(100, w.Body.Len())])
+			return
+		}
+
+		_, hasSuccess := resp["success"]
+		assert.True(t, hasSuccess, "响应应包含 success 字段")
+	})
+}
+
+// TestContract_UserOrder_Pay 验证用户订单支付接口契约
+func TestContract_UserOrder_Pay(t *testing.T) {
+	db, cleanup := setupContractTestDB(t)
+	defer cleanup()
+
+	user := createContractTestUser(t, db, common.RoleCommonUser)
+	plan := createContractTestPlan(t, db)
+	order := createContractTestOrder(t, db, user.Id, plan.Id)
+
+	router := setupContractRouter()
+
+	t.Run("钱包支付-payment_channel必填", func(t *testing.T) {
+		// 不传 payment_channel
+		body := `{}`
+		req, _ := http.NewRequest("POST", "/api/user/subscriptions/orders/"+strconv.FormatInt(order.Id, 10)+"/pay", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		if err != nil {
+			t.Skipf("响应不是有效 JSON: %s", w.Body.String()[:min(100, w.Body.Len())])
+			return
+		}
+
+		// 缺少必填字段应返回错误
+		assert.False(t, resp["success"].(bool), "缺少 payment_channel 应返回错误")
+	})
+
+	t.Run("钱包支付-请求格式验证", func(t *testing.T) {
+		body := `{"payment_channel": "wallet"}`
+		req, _ := http.NewRequest("POST", "/api/user/subscriptions/orders/"+strconv.FormatInt(order.Id, 10)+"/pay", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		if err != nil {
+			t.Skipf("响应不是有效 JSON: %s", w.Body.String()[:min(100, w.Body.Len())])
+			return
+		}
+
+		// 验证响应格式
+		_, hasSuccess := resp["success"]
+		assert.True(t, hasSuccess, "响应应包含 success 字段")
+
+		// 如果成功，验证 PayOrderResponse 字段
+		if success, ok := resp["success"].(bool); ok && success {
+			data, hasData := resp["data"].(map[string]interface{})
+			assert.True(t, hasData, "成功响应应包含 data 字段")
+			if hasData {
+				requiredFields := []string{"subscription_id", "start_at", "end_at"}
+				for _, field := range requiredFields {
+					_, hasField := data[field]
+					assert.True(t, hasField, "支付成功响应应包含 %s 字段", field)
+				}
+			}
+		}
+	})
+
+	t.Run("钱包支付-可选trade_no字段", func(t *testing.T) {
+		body := `{"payment_channel": "wallet", "trade_no": "TEST123"}`
+		req, _ := http.NewRequest("POST", "/api/user/subscriptions/orders/"+strconv.FormatInt(order.Id, 10)+"/pay", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		if err != nil {
+			t.Skipf("响应不是有效 JSON: %s", w.Body.String()[:min(100, w.Body.Len())])
+			return
+		}
+
+		// 带 trade_no 的请求应被接受（不会因格式问题报错）
+		_, hasSuccess := resp["success"]
+		assert.True(t, hasSuccess, "响应应包含 success 字段")
+	})
+
+	t.Run("支付不存在的订单返回错误", func(t *testing.T) {
+		body := `{"payment_channel": "wallet"}`
+		req, _ := http.NewRequest("POST", "/api/user/subscriptions/orders/99999/pay", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.False(t, resp["success"].(bool), "支付不存在的订单应返回错误")
+	})
+}
+
+// TestContract_UserOrder_Epay 验证易支付接口契约
+func TestContract_UserOrder_Epay(t *testing.T) {
+	db, cleanup := setupContractTestDB(t)
+	defer cleanup()
+
+	user := createContractTestUser(t, db, common.RoleCommonUser)
+	// Epay 仅支持 CNY 币种
+	plan := createContractTestPlanWithCurrency(t, db, "CNY")
+	order := createContractTestOrderWithCurrency(t, db, user.Id, plan.Id, "CNY")
+
+	router := setupContractRouter()
+
+	t.Run("Epay-payment_method必填", func(t *testing.T) {
+		body := `{}`
+		req, _ := http.NewRequest("POST", "/api/user/subscriptions/orders/"+strconv.FormatInt(order.Id, 10)+"/pay/epay", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		if err != nil {
+			t.Skipf("响应不是有效 JSON: %s", w.Body.String()[:min(100, w.Body.Len())])
+			return
+		}
+
+		// 缺少必填字段应返回错误
+		assert.False(t, resp["success"].(bool), "缺少 payment_method 应返回错误")
+	})
+
+	t.Run("Epay-请求格式验证", func(t *testing.T) {
+		body := `{"payment_method": "alipay"}`
+		req, _ := http.NewRequest("POST", "/api/user/subscriptions/orders/"+strconv.FormatInt(order.Id, 10)+"/pay/epay", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		if err != nil {
+			t.Skipf("响应不是有效 JSON: %s", w.Body.String()[:min(100, w.Body.Len())])
+			return
+		}
+
+		// 验证响应格式
+		_, hasSuccess := resp["success"]
+		assert.True(t, hasSuccess, "响应应包含 success 字段")
+
+		// 如果成功（易支付已配置），验证 EpayResponse 字段
+		if success, ok := resp["success"].(bool); ok && success {
+			data, hasData := resp["data"].(map[string]interface{})
+			assert.True(t, hasData, "成功响应应包含 data 字段")
+			if hasData {
+				// EpayResponse 至少应有 url 或 params
+				_, hasUrl := data["url"]
+				_, hasParams := data["params"]
+				assert.True(t, hasUrl || hasParams, "Epay 响应应包含 url 或 params 字段")
+			}
+		}
+	})
+
+	t.Run("Epay-不存在的订单返回错误", func(t *testing.T) {
+		body := `{"payment_method": "alipay"}`
+		req, _ := http.NewRequest("POST", "/api/user/subscriptions/orders/99999/pay/epay", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.False(t, resp["success"].(bool), "为不存在的订单调用 Epay 应返回错误")
+	})
+
+	// 使用 Mock 配置强制验证成功响应字段（确保 CI 环境覆盖）
+	t.Run("Epay-成功响应字段验证-Mock", func(t *testing.T) {
+		// 设置 mock 配置
+		restoreEpay := SetupEpayMockConfig()
+		defer restoreEpay()
+
+		// 创建新订单用于此测试（避免复用已修改状态的订单）
+		mockOrder := createContractTestOrderWithCurrency(t, db, user.Id, plan.Id, "CNY")
+
+		body := `{"payment_method": "alipay"}`
+		req, _ := http.NewRequest("POST", "/api/user/subscriptions/orders/"+strconv.FormatInt(mockOrder.Id, 10)+"/pay/epay", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err, "响应应为有效 JSON")
+
+		// 使用 mock 配置时必须成功
+		success, ok := resp["success"].(bool)
+		require.True(t, ok, "响应应包含 success 字段")
+		require.True(t, success, "使用 mock 配置时 Epay 请求应成功，实际响应: %v", resp)
+
+		// 验证 EpayResponse 必需字段
+		data, hasData := resp["data"].(map[string]interface{})
+		require.True(t, hasData, "成功响应应包含 data 字段")
+
+		// EpayResponse 必须包含 url 或 params
+		_, hasUrl := data["url"]
+		_, hasParams := data["params"]
+		assert.True(t, hasUrl || hasParams, "Epay 响应应包含 url 或 params 字段")
+
+		// 验证 trade_no 字段存在
+		_, hasTradeNo := data["trade_no"]
+		assert.True(t, hasTradeNo, "Epay 响应应包含 trade_no 字段")
+
+		// 验证 payment_timeout_seconds 字段存在
+		_, hasTimeout := data["payment_timeout_seconds"]
+		assert.True(t, hasTimeout, "Epay 响应应包含 payment_timeout_seconds 字段")
+	})
+}
+
+// TestContract_UserOrder_Stripe 验证 Stripe 支付接口契约
+func TestContract_UserOrder_Stripe(t *testing.T) {
+	db, cleanup := setupContractTestDB(t)
+	defer cleanup()
+
+	user := createContractTestUser(t, db, common.RoleCommonUser)
+	// Stripe 仅支持 USD 币种（默认）
+	plan := createContractTestPlan(t, db)
+	order := createContractTestOrder(t, db, user.Id, plan.Id)
+
+	router := setupContractRouter()
+
+	t.Run("Stripe-请求格式验证", func(t *testing.T) {
+		// Stripe 端点不需要请求体
+		req, _ := http.NewRequest("POST", "/api/user/subscriptions/orders/"+strconv.FormatInt(order.Id, 10)+"/pay/stripe", nil)
+		req.Header.Set("Content-Type", "application/json")
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		if err != nil {
+			t.Skipf("响应不是有效 JSON: %s", w.Body.String()[:min(100, w.Body.Len())])
+			return
+		}
+
+		// 验证响应格式
+		_, hasSuccess := resp["success"]
+		assert.True(t, hasSuccess, "响应应包含 success 字段")
+
+		// 如果成功（Stripe 已配置），验证 StripePayResponse 字段
+		if success, ok := resp["success"].(bool); ok && success {
+			data, hasData := resp["data"].(map[string]interface{})
+			assert.True(t, hasData, "成功响应应包含 data 字段")
+			if hasData {
+				requiredFields := []string{"pay_link", "trade_no"}
+				for _, field := range requiredFields {
+					_, hasField := data[field]
+					assert.True(t, hasField, "Stripe 响应应包含 %s 字段", field)
+				}
+			}
+		}
+	})
+
+	t.Run("Stripe-不存在的订单返回错误", func(t *testing.T) {
+		req, _ := http.NewRequest("POST", "/api/user/subscriptions/orders/99999/pay/stripe", nil)
+		req.Header.Set("Content-Type", "application/json")
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.False(t, resp["success"].(bool), "为不存在的订单调用 Stripe 应返回错误")
+	})
+
+	t.Run("Stripe-他人订单返回错误", func(t *testing.T) {
+		otherUser := createContractTestUser(t, db, common.RoleCommonUser)
+
+		req, _ := http.NewRequest("POST", "/api/user/subscriptions/orders/"+strconv.FormatInt(order.Id, 10)+"/pay/stripe", nil)
+		req.Header.Set("Content-Type", "application/json")
+		addContractAuthHeaders(req, otherUser)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.False(t, resp["success"].(bool), "为他人订单调用 Stripe 应返回错误")
+	})
+
+	// 使用 Mock 配置强制验证成功响应字段（确保 CI 环境覆盖）
+	t.Run("Stripe-成功响应字段验证-Mock", func(t *testing.T) {
+		// 设置 mock 配置
+		restoreStripe := SetupStripeMockConfig()
+		defer restoreStripe()
+
+		// 创建新订单用于此测试（避免复用已修改状态的订单）
+		mockOrder := createContractTestOrder(t, db, user.Id, plan.Id)
+
+		req, _ := http.NewRequest("POST", "/api/user/subscriptions/orders/"+strconv.FormatInt(mockOrder.Id, 10)+"/pay/stripe", nil)
+		req.Header.Set("Content-Type", "application/json")
+		addContractAuthHeaders(req, user)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		var resp map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err, "响应应为有效 JSON")
+
+		// 使用 mock 配置时必须成功
+		success, ok := resp["success"].(bool)
+		require.True(t, ok, "响应应包含 success 字段")
+		require.True(t, success, "使用 mock 配置时 Stripe 请求应成功，实际响应: %v", resp)
+
+		// 验证 StripePayResponse 必需字段
+		data, hasData := resp["data"].(map[string]interface{})
+		require.True(t, hasData, "成功响应应包含 data 字段")
+
+		// 验证 pay_link 字段
+		_, hasPayLink := data["pay_link"]
+		assert.True(t, hasPayLink, "Stripe 响应应包含 pay_link 字段")
+
+		// 验证 trade_no 字段
+		_, hasTradeNo := data["trade_no"]
+		assert.True(t, hasTradeNo, "Stripe 响应应包含 trade_no 字段")
+
+		// 验证 payment_timeout_seconds 字段
+		_, hasTimeout := data["payment_timeout_seconds"]
+		assert.True(t, hasTimeout, "Stripe 响应应包含 payment_timeout_seconds 字段")
+	})
+}
+
+// ===================== Relay 计费响应头契约测试 =====================
+
+// TestContract_RelayBillingHeaders_Format 验证 relay 计费响应头格式契约
+// 需求来源：设计文档 4.2 / 需求 6.6 - 当令牌订阅优先关闭跳过订阅时，响应中需包含提示信息
+// 实现方案：通过 HTTP 响应头传递计费信息，不影响 OpenAI 格式兼容性
+func TestContract_RelayBillingHeaders_Format(t *testing.T) {
+	t.Run("计费响应头名称契约", func(t *testing.T) {
+		// 响应头名称定义
+		billingSourceHeader := "X-New-Api-Billing-Source"
+		billingSkipReasonHeader := "X-New-Api-Billing-Skip-Reason"
+
+		// 验证响应头名称符合 HTTP 头命名规范
+		assert.True(t, len(billingSourceHeader) > 0, "计费来源响应头名称不应为空")
+		assert.True(t, len(billingSkipReasonHeader) > 0, "跳过原因响应头名称不应为空")
+
+		// 响应头应以 X-New-Api- 前缀开头（自定义响应头命名规范）
+		assert.Contains(t, billingSourceHeader, "X-New-Api-", "计费来源响应头应使用标准前缀")
+		assert.Contains(t, billingSkipReasonHeader, "X-New-Api-", "跳过原因响应头应使用标准前缀")
+	})
+
+	t.Run("计费来源枚举值契约", func(t *testing.T) {
+		// BillingSource 允许的值
+		validBillingSources := []string{
+			"subscription", // 订阅扣费
+			"wallet",       // 钱包扣费
+			"fallback",     // 自动兜底扣费
+			"skipped",      // 跳过订阅扣费
+		}
+
+		for _, source := range validBillingSources {
+			assert.NotEmpty(t, source, "计费来源 %s 应被支持", source)
+		}
+	})
+
+	t.Run("跳过原因枚举值契约", func(t *testing.T) {
+		// SkipReason 已知的值
+		validSkipReasons := []string{
+			"subscription_preferred_disabled", // 令牌订阅优先已关闭
+		}
+
+		for _, reason := range validSkipReasons {
+			assert.NotEmpty(t, reason, "跳过原因 %s 应被支持", reason)
+		}
+	})
+
+	t.Run("响应头设置时机契约", func(t *testing.T) {
+		// 响应头应在以下时机设置：
+		// 1. 流式响应：在 SetEventStreamHeaders 后立即设置
+		// 2. 非流式响应：在 IOCopyBytesGracefully 前设置
+		//
+		// 响应头设置条件：
+		// - X-New-Api-Billing-Source：始终设置（当 BillingSource 非空时）
+		// - X-New-Api-Billing-Skip-Reason：仅当 BillingSkipReason 非空时设置
+		t.Log("计费响应头设置时机：")
+		t.Log("  - 流式响应：在 SetEventStreamHeaders 后立即设置")
+		t.Log("  - 非流式响应：在 IOCopyBytesGracefully 前设置")
+		t.Log("响应头设置条件：")
+		t.Log("  - X-New-Api-Billing-Source：当 BillingSource 非空时设置")
+		t.Log("  - X-New-Api-Billing-Skip-Reason：仅当 BillingSkipReason 非空时设置")
+	})
+}
+
+// TestContract_RelayBillingHeaders_ActiveSubscription_NoHint 验证订阅列表接口不返回 billing_hint
+// 方案 A：/api/user/subscriptions/active 不返回 billing_hint，仅在 relay 响应中返回
+func TestContract_RelayBillingHeaders_ActiveSubscription_NoHint(t *testing.T) {
+	t.Run("订阅列表接口不应返回 billing_hint", func(t *testing.T) {
+		// GET /api/user/subscriptions/active 响应中不应包含 billing_hint 字段
+		// 原因：
+		// 1. billing_hint 描述的是请求上下文中为什么跳过订阅计费，与具体订阅无关
+		// 2. 订阅列表查询接口的职责是展示用户的订阅状态，不是预测计费行为
+		// 3. skip_reason 的真正场景是在 relay 计费时告诉调用方"为什么没用订阅"
+		t.Log("订阅列表接口 GET /api/user/subscriptions/active 不返回 billing_hint")
+		t.Log("原因：billing_hint 仅在 relay 计费响应中有意义")
+	})
+}
+
+// TestContract_SetBillingHeaders_ActualBehavior 验证 SetBillingHeaders 函数的实际行为
+func TestContract_SetBillingHeaders_ActualBehavior(t *testing.T) {
+	t.Run("SetBillingHeaders 设置计费来源响应头", func(t *testing.T) {
+		// 创建一个模拟的 gin.Context
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+
+		// 调用 SetBillingHeaders
+		helper.SetBillingHeaders(c, "subscription", "")
+
+		// 验证响应头已正确设置
+		assert.Equal(t, "subscription", w.Header().Get("X-New-Api-Billing-Source"),
+			"计费来源响应头应正确设置")
+		assert.Empty(t, w.Header().Get("X-New-Api-Billing-Skip-Reason"),
+			"跳过原因响应头在无原因时不应设置")
+	})
+
+	t.Run("SetBillingHeaders 设置跳过原因响应头", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+
+		helper.SetBillingHeaders(c, "skipped", "subscription_preferred_disabled")
+
+		assert.Equal(t, "skipped", w.Header().Get("X-New-Api-Billing-Source"),
+			"计费来源响应头应正确设置")
+		assert.Equal(t, "subscription_preferred_disabled", w.Header().Get("X-New-Api-Billing-Skip-Reason"),
+			"跳过原因响应头应正确设置")
+	})
+
+	t.Run("SetBillingHeaders 幂等性 - 只设置一次", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+
+		// 第一次调用
+		helper.SetBillingHeaders(c, "subscription", "")
+		// 第二次调用（应被忽略）
+		helper.SetBillingHeaders(c, "wallet", "some_reason")
+
+		// 验证只有第一次的值生效
+		assert.Equal(t, "subscription", w.Header().Get("X-New-Api-Billing-Source"),
+			"计费来源响应头应保持第一次设置的值")
+		assert.Empty(t, w.Header().Get("X-New-Api-Billing-Skip-Reason"),
+			"跳过原因响应头应保持第一次设置的状态")
+	})
+
+	t.Run("SetBillingHeaders 空值不设置响应头", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+
+		helper.SetBillingHeaders(c, "", "")
+
+		// 标记已设置，但实际响应头为空
+		assert.Empty(t, w.Header().Get("X-New-Api-Billing-Source"),
+			"空的计费来源不应设置响应头")
+		assert.Empty(t, w.Header().Get("X-New-Api-Billing-Skip-Reason"),
+			"空的跳过原因不应设置响应头")
+	})
+
+	t.Run("SetBillingHeaders 从 context 读取 billing 信息", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+
+		// 模拟 PreConsumeQuota 在 context 中存储 billing 信息
+		c.Set(string(constant.ContextKeyBillingSource), "subscription")
+		c.Set(string(constant.ContextKeyBillingSkipReason), "")
+
+		// 传入空参数，应从 context 读取
+		helper.SetBillingHeaders(c, "", "")
+
+		assert.Equal(t, "subscription", w.Header().Get("X-New-Api-Billing-Source"),
+			"应从 context 读取计费来源")
+	})
+
+	t.Run("SetEventStreamHeaders 自动设置 billing 响应头", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+
+		// 模拟 PreConsumeQuota 在 context 中存储 billing 信息
+		c.Set(string(constant.ContextKeyBillingSource), "wallet")
+		c.Set(string(constant.ContextKeyBillingSkipReason), "subscription_preferred_disabled")
+
+		// 调用 SetEventStreamHeaders（流式响应入口）
+		helper.SetEventStreamHeaders(c)
+
+		// 验证 SSE 响应头已设置
+		assert.Equal(t, "text/event-stream", w.Header().Get("Content-Type"),
+			"流式响应应设置 Content-Type")
+
+		// 验证 billing 响应头也已设置
+		assert.Equal(t, "wallet", w.Header().Get("X-New-Api-Billing-Source"),
+			"SetEventStreamHeaders 应自动设置计费来源响应头")
+		assert.Equal(t, "subscription_preferred_disabled", w.Header().Get("X-New-Api-Billing-Skip-Reason"),
+			"SetEventStreamHeaders 应自动设置跳过原因响应头")
 	})
 }

@@ -285,8 +285,12 @@ func (s *RedemptionService) RedeemSubscription(userId int, key string, redeemOpt
 		return result, err
 	}
 
-	// 事务提交成功后刷新缓存
+	// 事务提交成功后刷新缓存并预热
 	s.priorityService.InvalidateUserSubscriptionCache(int64(userId))
+	cacheSvc := GetSubscriptionCacheService()
+	go func() {
+		_ = cacheSvc.WarmupCache(int64(userId))
+	}()
 
 	result.Success = true
 	return result, nil
@@ -1352,8 +1356,12 @@ func (s *RedemptionService) redeemWithBoundCoupon(userId int, key string, redeem
 		return result, err
 	}
 
-	// 事务提交成功后刷新缓存
+	// 事务提交成功后刷新缓存并预热
 	s.priorityService.InvalidateUserSubscriptionCache(int64(userId))
+	cacheSvc := GetSubscriptionCacheService()
+	go func() {
+		_ = cacheSvc.WarmupCache(int64(userId))
+	}()
 
 	result.Success = true
 	return result, nil

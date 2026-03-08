@@ -577,8 +577,11 @@ func (s *SubscriptionOrderService) processPayment(userId int64, orderId int64, p
 	}
 
 	if subscription != nil {
+		// 缓存预热：订单激活订阅后主动预热缓存（而不是仅失效等待回源）
 		cacheSvc := GetSubscriptionCacheService()
-		_ = cacheSvc.InvalidateOnStatusChange(userId, subscription.Id)
+		go func() {
+			_ = cacheSvc.WarmupCache(userId)
+		}()
 		GetSubscriptionPriorityService().InvalidateUserSubscriptionCache(userId)
 	}
 

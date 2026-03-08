@@ -52,4 +52,8 @@ const (
 	ContextKeyLocalCountTokens ContextKey = "local_count_tokens"
 
 	ContextKeySystemPromptOverride ContextKey = "system_prompt_override"
+
+	/* billing related keys */
+	ContextKeyBillingSource     ContextKey = "billing_source"
+	ContextKeyBillingSkipReason ContextKey = "billing_skip_reason"
 )

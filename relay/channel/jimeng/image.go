@@ -80,6 +80,8 @@ func jimengImageHandler(c *gin.Context, resp *http.Response, info *relaycommon.R
 	}
 
 	c.Writer.Header().Set("Content-Type", "application/json")
+	// 从 context 读取并设置计费响应头
+	service.SetBillingHeadersFromContext(c)
 	c.Writer.WriteHeader(resp.StatusCode)
 	_, err = c.Writer.Write(jsonResponse)
 	if err != nil {

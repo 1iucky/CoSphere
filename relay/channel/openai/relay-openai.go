@@ -289,6 +289,9 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 		responseBody = geminiRespStr
 	}
 
+	// 设置计费响应头（包含 billing_source 和 skip_reason）
+	helper.SetBillingHeaders(c, info.BillingSource, info.BillingSkipReason)
+
 	service.IOCopyBytesGracefully(c, resp, responseBody)
 
 	return &simpleResponse.Usage, nil
@@ -341,6 +344,8 @@ func OpenaiTTSHandler(c *gin.Context, resp *http.Response, info *relaycommon.Rel
 	for k, v := range resp.Header {
 		c.Writer.Header().Set(k, v[0])
 	}
+	// 设置计费响应头（包含 billing_source 和 skip_reason）
+	helper.SetBillingHeaders(c, info.BillingSource, info.BillingSkipReason)
 	c.Writer.WriteHeader(resp.StatusCode)
 
 	isStreaming := resp.ContentLength == -1 || resp.Header.Get("Content-Length") == ""
@@ -363,6 +368,8 @@ func OpenaiSTTHandler(c *gin.Context, resp *http.Response, info *relaycommon.Rel
 	if err != nil {
 		return types.NewOpenAIError(err, types.ErrorCodeReadResponseBodyFailed, http.StatusInternalServerError), nil
 	}
+	// 设置计费响应头（包含 billing_source 和 skip_reason）
+	helper.SetBillingHeaders(c, info.BillingSource, info.BillingSkipReason)
 	// 写入新的 response body
 	service.IOCopyBytesGracefully(c, resp, responseBody)
 
@@ -627,6 +634,9 @@ func OpenaiHandlerWithUsage(c *gin.Context, info *relaycommon.RelayInfo, resp *h
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
 	}
+
+	// 设置计费响应头（包含 billing_source 和 skip_reason）
+	helper.SetBillingHeaders(c, info.BillingSource, info.BillingSkipReason)
 
 	// 写入新的 response body
 	service.IOCopyBytesGracefully(c, resp, responseBody)

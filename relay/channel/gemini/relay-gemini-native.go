@@ -53,6 +53,9 @@ func GeminiTextGenerationHandler(c *gin.Context, info *relaycommon.RelayInfo, re
 		}
 	}
 
+	// 设置计费响应头（包含 billing_source 和 skip_reason）
+	helper.SetBillingHeaders(c, info.BillingSource, info.BillingSkipReason)
+
 	service.IOCopyBytesGracefully(c, resp, responseBody)
 
 	return &usage, nil
@@ -90,6 +93,9 @@ func NativeGeminiEmbeddingHandler(c *gin.Context, resp *http.Response, info *rel
 			return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
 		}
 	}
+
+	// 设置计费响应头（包含 billing_source 和 skip_reason）
+	helper.SetBillingHeaders(c, info.BillingSource, info.BillingSkipReason)
 
 	service.IOCopyBytesGracefully(c, resp, responseBody)
 

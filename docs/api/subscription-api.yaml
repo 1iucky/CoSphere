@@ -495,7 +495,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [pending, paid, cancelled, expired, failed]
+            enum: [pending, paid, cancelled, expired, failed, refunded]
         - name: payment_channel
           in: query
           schema:
@@ -1042,6 +1042,28 @@ paths:
       summary: 获取用户订单列表
       security:
         - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, paid, cancelled, expired, failed, refunded]
+          description: 订单状态筛选
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: 页码
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: 每页数量
       responses:
         '200':
           description: 成功
@@ -1056,6 +1078,9 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/SubscriptionOrderResponse'
+                      total:
+                        type: integer
+                        description: 总记录数
     post:
       tags:
         - User - Subscriptions
@@ -1079,7 +1104,7 @@ paths:
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/SubscriptionOrderResponse'
+                        $ref: '#/components/schemas/CreateOrderResponse'
 
   /user/subscriptions/orders/preview:
     post:
@@ -1109,7 +1134,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/OrderPreviewResponse'
 
   /user/subscriptions/orders/purchase:
     post:
@@ -1140,7 +1170,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PurchaseResponse'
 
   /user/subscriptions/orders/{id}:
     get:
@@ -1169,6 +1204,111 @@ paths:
       tags:
         - User - Subscriptions
       summary: 支付订单
+      description: 使用钱包余额支付订单。仅支持 wallet 和 free 渠道。
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - payment_channel
+              properties:
+                payment_channel:
+                  type: string
+                  enum: [wallet, free]
+                  description: 支付渠道（wallet-钱包余额，free-免费订单）
+                trade_no:
+                  type: string
+                  description: 交易号（第三方回调时使用，用户直接调用可忽略）
+      responses:
+        '200':
+          description: 支付成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PayOrderResponse'
+
+  /user/subscriptions/orders/{id}/pay/epay:
+    post:
+      tags:
+        - User - Subscriptions
+      summary: 易支付入口
+      description: |
+        为订阅订单生成易支付链接。仅支持 CNY 币种订单。
+        返回的支付链接用于跳转到第三方支付页面，支付完成后系统自动回调确认。
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - payment_method
+              properties:
+                payment_method:
+                  type: string
+                  description: |
+                    支付方式标识，由系统配置决定可用值。
+                    常见值：alipay（支付宝）、wxpay（微信支付）。
+                    管理员可通过系统设置配置自定义支付方式（如 custom1 等）。
+      responses:
+        '200':
+          description: 成功获取支付链接
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/EpayResponse'
+
+  /user/subscriptions/orders/{id}/pay/stripe:
+    post:
+      tags:
+        - User - Subscriptions
+      summary: Stripe 支付入口
+      description: |
+        为订阅订单生成 Stripe Checkout 链接。仅支持 USD 币种订单。
+        返回的支付链接用于跳转到 Stripe 支付页面，支付完成后系统自动回调确认。
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: 成功获取支付链接
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/StripePayResponse'
+
+  /user/subscriptions/orders/{id}/cancel:
+    post:
+      tags:
+        - User - Subscriptions
+      summary: 取消订单
+      description: 取消待支付的订单。已支付订单无法直接取消。
       security:
         - BearerAuth: []
       parameters:
@@ -1179,27 +1319,10 @@ paths:
             schema:
               type: object
               properties:
-                payment_channel:
+                reason:
                   type: string
-                  enum: [wallet, free]
-                  description: 支付渠道
-      responses:
-        '200':
-          description: 支付成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessResponse'
-
-  /user/subscriptions/orders/{id}/cancel:
-    post:
-      tags:
-        - User - Subscriptions
-      summary: 取消订单
-      security:
-        - BearerAuth: []
-      parameters:
-        - $ref: '#/components/parameters/IdParam'
+                  maxLength: 500
+                  description: 取消原因（可选）
       responses:
         '200':
           description: 取消成功
@@ -1390,6 +1513,28 @@ paths:
       summary: 获取用户的优惠券列表
       security:
         - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [available, used, expired]
+          description: 优惠券状态筛选
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: 页码
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+          description: 每页数量
       responses:
         '200':
           description: 成功
@@ -1404,6 +1549,9 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/UserCouponResponse'
+                      total:
+                        type: integer
+                        description: 总记录数
 
   /user/coupons/claim:
     post:
@@ -2061,6 +2209,166 @@ components:
             $ref: '#/components/schemas/SubscriptionUsagePeriodSummary'
 
     # ==================== Subscription Order Schemas ====================
+    CreateOrderRequest:
+      type: object
+      required:
+        - plan_id
+        - payment_channel
+      properties:
+        plan_id:
+          type: integer
+          minimum: 1
+          description: 套餐 ID
+        coupon_code:
+          type: string
+          maxLength: 64
+          description: 优惠券码
+        payment_channel:
+          type: string
+          enum: [wallet, alipay, wechat, stripe, paypal]
+          description: 支付渠道
+        redeem_option:
+          type: string
+          enum: [stack, coexist, convert]
+          description: 冲突处理选项
+        metadata:
+          type: string
+          description: 扩展元数据（JSON）
+
+    CreateOrderResponse:
+      type: object
+      description: 创建订单成功响应
+      properties:
+        order_id:
+          type: integer
+          description: 订单 ID
+        plan_id:
+          type: integer
+          description: 套餐 ID
+        final_price_cents:
+          type: integer
+          description: 最终支付金额（分）
+        original_price:
+          type: integer
+          description: 原始价格（分）
+        discount_amount:
+          type: integer
+          description: 优惠金额（分）
+        payment_channel:
+          type: string
+          description: 支付渠道
+        status:
+          type: string
+          enum: [pending, paid, cancelled, expired, failed, refunded]
+          description: 订单状态
+        is_idempotent:
+          type: boolean
+          description: 是否为幂等返回（已存在同参数订单）
+        next_step:
+          type: string
+          description: 下一步操作指引
+        payment_timeout_seconds:
+          type: integer
+          description: 支付超时时间（秒），第三方支付时返回
+
+    OrderPreviewResponse:
+      type: object
+      description: 订单预览响应
+      properties:
+        plan_id:
+          type: integer
+          description: 套餐 ID
+        plan_name:
+          type: string
+          description: 套餐名称
+        price_cents:
+          type: integer
+          description: 原始价格（分）
+        discount_cents:
+          type: integer
+          description: 优惠金额（分）
+        final_price_cents:
+          type: integer
+          description: 最终价格（分）
+        currency:
+          type: string
+          description: 币种
+        coupon_applied:
+          type: boolean
+          description: 是否应用了优惠券
+        coupon_code:
+          type: string
+          description: 应用的优惠券码
+
+    PurchaseResponse:
+      type: object
+      description: 一键购买响应
+      properties:
+        order_id:
+          type: integer
+          description: 订单 ID
+        subscription_id:
+          type: integer
+          description: 订阅 ID
+        plan_id:
+          type: integer
+          description: 套餐 ID
+        start_at:
+          type: integer
+          description: 订阅开始时间戳
+        end_at:
+          type: integer
+          description: 订阅结束时间戳
+        amount_paid:
+          type: integer
+          description: 已支付金额（分）
+
+    PayOrderResponse:
+      type: object
+      description: 余额支付订单成功响应
+      properties:
+        subscription_id:
+          type: integer
+          description: 创建的订阅 ID
+        start_at:
+          type: integer
+          description: 订阅开始时间戳
+        end_at:
+          type: integer
+          description: 订阅结束时间戳
+
+    EpayResponse:
+      type: object
+      description: Epay 支付响应（人民币支付）
+      properties:
+        url:
+          type: string
+          description: 支付跳转 URL
+        params:
+          type: object
+          description: 支付参数（用于构建支付表单）
+          additionalProperties: true
+        trade_no:
+          type: string
+          description: 交易号
+        payment_timeout_seconds:
+          type: integer
+          description: 支付超时时间（秒）
+
+    StripePayResponse:
+      type: object
+      description: Stripe 支付响应（外币支付）
+      properties:
+        pay_link:
+          type: string
+          description: Stripe 支付链接
+        trade_no:
+          type: string
+          description: 交易号
+        payment_timeout_seconds:
+          type: integer
+          description: 支付超时时间（秒）
+
     SubscriptionOrderResponse:
       type: object
       properties:
@@ -2093,7 +2401,7 @@ components:
           nullable: true
         status:
           type: string
-          enum: [pending, paid, cancelled, expired, failed]
+          enum: [pending, paid, cancelled, expired, failed, refunded]
         metadata:
           type: string
         created_at:

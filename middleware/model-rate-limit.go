@@ -21,6 +21,18 @@ const (
 	ModelRequestRateLimitSuccessCountMark = "MRRLS"
 )
 
+// getRateLimitIdentifier 根据配置的粒度返回限流标识符
+func getRateLimitIdentifier(c *gin.Context) string {
+	if setting.ModelRequestRateLimitScope == setting.RateLimitScopeToken {
+		tokenId := c.GetInt("token_id")
+		if tokenId > 0 {
+			return strconv.Itoa(tokenId)
+		}
+	}
+	// 默认使用用户粒度
+	return strconv.Itoa(c.GetInt("id"))
+}
+
 // 检查Redis中的请求限制
 func checkRedisRateLimit(ctx context.Context, rdb *redis.Client, key string, maxCount int, duration int64) (bool, error) {
 	// 如果maxCount为0，表示不限制
@@ -77,12 +89,12 @@ func recordRedisRequest(ctx context.Context, rdb *redis.Client, key string, maxC
 // Redis限流处理器
 func redisRateLimitHandler(duration int64, totalMaxCount, successMaxCount int) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userId := strconv.Itoa(c.GetInt("id"))
+		identifier := getRateLimitIdentifier(c)
 		ctx := context.Background()
 		rdb := common.RDB
 
 		// 1. 检查成功请求数限制
-		successKey := fmt.Sprintf("rateLimit:%s:%s", ModelRequestRateLimitSuccessCountMark, userId)
+		successKey := fmt.Sprintf("rateLimit:%s:%s", ModelRequestRateLimitSuccessCountMark, identifier)
 		allowed, err := checkRedisRateLimit(ctx, rdb, successKey, successMaxCount, duration)
 		if err != nil {
 			fmt.Println("检查成功请求数限制失败:", err.Error())
@@ -94,9 +106,9 @@ func redisRateLimitHandler(duration int64, totalMaxCount, successMaxCount int) g
 			return
 		}
 
-		//2.检查总请求数限制并记录总请求（当totalMaxCount为0时会自动跳过，使用令牌桶限流器
+		//2.检查总请求数限制并记录总请求（当totalMaxCount为0时会自动跳过，使用令牌��限流器
 		if totalMaxCount > 0 {
-			totalKey := fmt.Sprintf("rateLimit:%s", userId)
+			totalKey := fmt.Sprintf("rateLimit:%s", identifier)
 			// 初始化
 			tb := limiter.New(ctx, rdb)
 			allowed, err = tb.Allow(
@@ -133,9 +145,9 @@ func memoryRateLimitHandler(duration int64, totalMaxCount, successMaxCount int) 
 	inMemoryRateLimiter.Init(time.Duration(setting.ModelRequestRateLimitDurationMinutes) * time.Minute)
 
 	return func(c *gin.Context) {
-		userId := strconv.Itoa(c.GetInt("id"))
-		totalKey := ModelRequestRateLimitCountMark + userId
-		successKey := ModelRequestRateLimitSuccessCountMark + userId
+		identifier := getRateLimitIdentifier(c)
+		totalKey := ModelRequestRateLimitCountMark + identifier
+		successKey := ModelRequestRateLimitSuccessCountMark + identifier
 
 		// 1. 检查总请求数限制（当totalMaxCount为0时跳过）
 		if totalMaxCount > 0 && !inMemoryRateLimiter.Request(totalKey, totalMaxCount, duration) {

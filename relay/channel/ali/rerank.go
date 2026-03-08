@@ -69,6 +69,8 @@ func RerankHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayI
 		return types.NewError(err, types.ErrorCodeBadResponseBody), nil
 	}
 	c.Writer.Header().Set("Content-Type", "application/json")
+	// 从 context 读取并设置计费响应头
+	service.SetBillingHeadersFromContext(c)
 	c.Writer.WriteHeader(resp.StatusCode)
 	c.Writer.Write(jsonResponse)
 	return nil, &usage
