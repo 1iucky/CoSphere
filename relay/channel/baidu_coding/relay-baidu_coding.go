@@ -1,0 +1,58 @@
+package baidu_coding
+
+import (
+	"strings"
+
+	"github.com/QuantumNous/new-api/dto"
+)
+
+func requestOpenAI2BaiduCoding(request dto.GeneralOpenAIRequest) *dto.GeneralOpenAIRequest {
+	messages := make([]dto.Message, 0, len(request.Messages))
+	for _, message := range request.Messages {
+		if !message.IsStringContent() {
+			mediaMessages := message.ParseContent()
+			for j, mediaMessage := range mediaMessages {
+				if mediaMessage.Type == dto.ContentTypeImageURL {
+					imageUrl := mediaMessage.GetImageMedia()
+					// 处理 base64 图片数据
+					if strings.HasPrefix(imageUrl.Url, "data:image/") {
+						if idx := strings.Index(imageUrl.Url, ","); idx != -1 {
+							imageUrl.Url = imageUrl.Url[idx+1:]
+						}
+					}
+					mediaMessage.ImageUrl = imageUrl
+					mediaMessages[j] = mediaMessage
+				}
+			}
+			message.SetMediaContent(mediaMessages)
+		}
+		messages = append(messages, dto.Message{
+			Role:       message.Role,
+			Content:    message.Content,
+			ToolCalls:  message.ToolCalls,
+			ToolCallId: message.ToolCallId,
+		})
+	}
+
+	// 处理 Stop 参数
+	str, ok := request.Stop.(string)
+	var Stop []string
+	if ok {
+		Stop = []string{str}
+	} else {
+		Stop, _ = request.Stop.([]string)
+	}
+
+	return &dto.GeneralOpenAIRequest{
+		Model:       request.Model,
+		Stream:      request.Stream,
+		Messages:    messages,
+		Temperature: request.Temperature,
+		TopP:        request.TopP,
+		MaxTokens:   request.GetMaxTokens(),
+		Stop:        Stop,
+		Tools:       request.Tools,
+		ToolChoice:  request.ToolChoice,
+		THINKING:    request.THINKING,
+	}
+}

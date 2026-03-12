@@ -79,6 +79,8 @@ func ChannelType2APIType(channelType int) (int, bool) {
 		apiType = constant.APITypeQwenCoding
 	case constant.ChannelTypeMiniMaxCoding:
 		apiType = constant.APITypeMiniMaxCoding
+	case constant.ChannelTypeBaiduCoding:
+		apiType = constant.APITypeBaiduCoding
 	}
 	if apiType == -1 {
 		return constant.APITypeOpenAI, false

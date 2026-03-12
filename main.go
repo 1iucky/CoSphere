@@ -127,6 +127,7 @@ func main() {
 
 	// Initialize HTTP server
 	server := gin.New()
+	server.RedirectTrailingSlash = false // 禁用尾部斜杠自动重定向，避免代理路径丢失问题
 	server.Use(gin.CustomRecovery(func(c *gin.Context, err any) {
 		common.SysLog(fmt.Sprintf("panic detected: %v", err))
 		c.JSON(http.StatusInternalServerError, gin.H{
