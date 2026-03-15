@@ -109,6 +109,11 @@ export const CHANNEL_OPTIONS = [
     label: '百度千帆 Coding',
   },
   {
+    value: 61,
+    color: 'teal',
+    label: 'MiniMax 国际版 Coding',
+  },
+  {
     value: 27,
     color: 'blue',
     label: 'Perplexity',

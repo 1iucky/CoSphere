@@ -333,6 +333,8 @@ export function getChannelIcon(channelType) {
       return <Qwen.Color size={iconSize} />;
     case 59: // MiniMax Coding
       return <Minimax.Color size={iconSize} />;
+    case 61: // MiniMax 国际版 Coding
+      return <Minimax.Color size={iconSize} />;
     case 24: // Google Gemini
     case 11: // Google PaLM2
       return <Gemini.Color size={iconSize} />;

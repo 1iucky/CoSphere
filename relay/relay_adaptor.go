@@ -19,6 +19,8 @@ import (
 	"github.com/QuantumNous/new-api/relay/channel/jimeng"
 	"github.com/QuantumNous/new-api/relay/channel/jina"
 	"github.com/QuantumNous/new-api/relay/channel/minimax"
+	"github.com/QuantumNous/new-api/relay/channel/minimax_coding"
+	"github.com/QuantumNous/new-api/relay/channel/minimax_global_coding"
 	"github.com/QuantumNous/new-api/relay/channel/mistral"
 	"github.com/QuantumNous/new-api/relay/channel/mokaai"
 	"github.com/QuantumNous/new-api/relay/channel/moonshot"
@@ -48,7 +50,6 @@ import (
 	"github.com/QuantumNous/new-api/relay/channel/zhipu_4v"
 	"github.com/QuantumNous/new-api/relay/channel/zhipu_coding"
 	"github.com/QuantumNous/new-api/relay/channel/qwen_coding"
-	"github.com/QuantumNous/new-api/relay/channel/minimax_coding"
 	"github.com/QuantumNous/new-api/relay/channel/baidu_coding"
 	"github.com/gin-gonic/gin"
 )
@@ -83,6 +84,8 @@ func GetAdaptor(apiType int) channel.Adaptor {
 		return &minimax_coding.Adaptor{}
 	case constant.APITypeBaiduCoding:
 		return &baidu_coding.Adaptor{}
+	case constant.APITypeMiniMaxGlobalCoding:
+		return &minimax_global_coding.Adaptor{}
 	case constant.APITypeOllama:
 		return &ollama.Adaptor{}
 	case constant.APITypePerplexity:
