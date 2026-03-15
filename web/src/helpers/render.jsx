@@ -319,6 +319,7 @@ export function getChannelIcon(channelType) {
       return <DeepSeek.Color size={iconSize} />;
     case 15: // 百度文心千帆
     case 46: // 百度文心千帆V2
+    case 60: // 百度千帆 Coding
       return <Wenxin.Color size={iconSize} />;
     case 17: // 阿里通义千问
       return <Qwen.Color size={iconSize} />;
@@ -326,7 +327,12 @@ export function getChannelIcon(channelType) {
       return <Spark.Color size={iconSize} />;
     case 16: // 智谱 ChatGLM
     case 26: // 智谱 GLM-4V
+    case 57: // 智谱 Coding
       return <Zhipu.Color size={iconSize} />;
+    case 58: // 千问 Coding
+      return <Qwen.Color size={iconSize} />;
+    case 59: // MiniMax Coding
+      return <Minimax.Color size={iconSize} />;
     case 24: // Google Gemini
     case 11: // Google PaLM2
       return <Gemini.Color size={iconSize} />;
