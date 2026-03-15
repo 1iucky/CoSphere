@@ -151,10 +151,10 @@ export default function RequestRateLimit(props) {
                   field='ModelRequestRateLimitScope'
                   label={t('速率限制粒度')}
                   type='button'
-                  onChange={(value) =>
+                  onChange={(e) =>
                     setInputs({
                       ...inputs,
-                      ModelRequestRateLimitScope: value,
+                      ModelRequestRateLimitScope: e.target.value,
                     })
                   }
                   extraText={
