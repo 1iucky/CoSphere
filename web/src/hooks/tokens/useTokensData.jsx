@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal } from '@douyinfe/semi-ui';
 import {
@@ -54,11 +54,15 @@ export const useTokensData = (openFluentNotification) => {
   const [compactMode, setCompactMode] = useTableCompactMode('tokens');
   const [showKeys, setShowKeys] = useState({});
 
+  // Sort state (ref to avoid closure stale)
+  const sortRef = useRef({ field: '', order: '' });
+
   // Form state
   const [formApi, setFormApi] = useState(null);
   const formInitValues = {
     searchKeyword: '',
     searchToken: '',
+    statusFilter: '',
   };
 
   // Get form values helper function
@@ -67,6 +71,7 @@ export const useTokensData = (openFluentNotification) => {
     return {
       searchKeyword: formValues.searchKeyword || '',
       searchToken: formValues.searchToken || '',
+      statusFilter: formValues.statusFilter || '',
     };
   };
 
@@ -91,7 +96,16 @@ export const useTokensData = (openFluentNotification) => {
   // Load tokens function
   const loadTokens = async (page = 1, size = pageSize) => {
     setLoading(true);
-    const res = await API.get(`/api/token/?p=${page}&size=${size}`);
+    const { statusFilter } = getFormValues();
+    let url = `/api/token/?p=${page}&size=${size}`;
+    if (statusFilter) {
+      url += `&status=${statusFilter}`;
+    }
+    const { field, order } = sortRef.current;
+    if (field) {
+      url += `&sort_field=${field}&sort_order=${order}`;
+    }
+    const res = await API.get(url);
     const { success, message, data } = res.data;
     if (success) {
       syncPageData(data);
@@ -189,15 +203,17 @@ export const useTokensData = (openFluentNotification) => {
 
   // Search tokens function
   const searchTokens = async () => {
-    const { searchKeyword, searchToken } = getFormValues();
+    const { searchKeyword, searchToken, statusFilter } = getFormValues();
     if (searchKeyword === '' && searchToken === '') {
       await loadTokens(1);
       return;
     }
     setSearching(true);
-    const res = await API.get(
-      `/api/token/search?keyword=${searchKeyword}&token=${searchToken}`,
-    );
+    let url = `/api/token/search?keyword=${searchKeyword}&token=${searchToken}`;
+    if (statusFilter) {
+      url += `&status=${statusFilter}`;
+    }
+    const res = await API.get(url);
     const { success, message, data } = res.data;
     if (success) {
       setTokens(data);
@@ -209,7 +225,17 @@ export const useTokensData = (openFluentNotification) => {
     setSearching(false);
   };
 
-  // Sort tokens function
+  // Sort handler for table column sorting
+  const onSort = (sorter) => {
+    if (sorter && sorter.dataIndex) {
+      sortRef.current = { field: sorter.dataIndex, order: sorter.sortOrder || 'desc' };
+    } else {
+      sortRef.current = { field: '', order: '' };
+    }
+    loadTokens(1);
+  };
+
+  // Legacy sort function (kept for compatibility)
   const sortToken = (key) => {
     if (tokens.length === 0) return;
     setLoading(true);
@@ -379,6 +405,7 @@ export const useTokensData = (openFluentNotification) => {
     manageToken,
     searchTokens,
     sortToken,
+    onSort,
     handlePageChange,
     handlePageSizeChange,
     rowSelection,

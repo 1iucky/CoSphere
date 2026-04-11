@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/QuantumNous/new-api/common"
 
@@ -143,18 +144,35 @@ func (token *Token) GetIpLimitsMap() map[string]any {
 	return ipLimitsMap
 }
 
-func GetAllUserTokens(userId int, startIdx int, num int) ([]*Token, error) {
+func GetAllUserTokens(userId int, status int, orderBy string, startIdx int, num int) ([]*Token, error) {
 	var tokens []*Token
 	var err error
-	err = DB.Where("user_id = ?", userId).Order("id desc").Limit(num).Offset(startIdx).Find(&tokens).Error
+	query := DB.Where("user_id = ?", userId)
+	if status > 0 {
+		query = query.Where("status = ?", status)
+	}
+	if orderBy == "" {
+		orderBy = "id desc"
+	}
+	err = query.Order(orderBy).Limit(num).Offset(startIdx).Find(&tokens).Error
 	return tokens, err
 }
 
-func SearchUserTokens(userId int, keyword string, token string) (tokens []*Token, err error) {
+func SearchUserTokens(userId int, keyword string, token string, status int) (tokens []*Token, err error) {
 	if token != "" {
 		token = strings.Trim(token, "sk-")
 	}
-	err = DB.Where("user_id = ?", userId).Where("name LIKE ?", "%"+keyword+"%").Where(commonKeyCol+" LIKE ?", "%"+token+"%").Find(&tokens).Error
+	query := DB.Where("user_id = ?", userId)
+	if keyword != "" {
+		query = query.Where("name LIKE ?", "%"+keyword+"%")
+	}
+	if token != "" {
+		query = query.Where(commonKeyCol+" LIKE ?", "%"+token+"%")
+	}
+	if status > 0 {
+		query = query.Where("status = ?", status)
+	}
+	err = query.Find(&tokens).Error
 	return tokens, err
 }
 
@@ -411,10 +429,87 @@ func decreaseTokenQuota(id int, quota int) (err error) {
 }
 
 // CountUserTokens returns total number of tokens for the given user, used for pagination
-func CountUserTokens(userId int) (int64, error) {
+func CountUserTokens(userId int, status int) (int64, error) {
 	var total int64
-	err := DB.Model(&Token{}).Where("user_id = ?", userId).Count(&total).Error
+	query := DB.Model(&Token{}).Where("user_id = ?", userId)
+	if status > 0 {
+		query = query.Where("status = ?", status)
+	}
+	err := query.Count(&total).Error
 	return total, err
+}
+
+// UpdateExpiredTokenStatuses 批量更新已过期/已耗尽的令牌状态
+func UpdateExpiredTokenStatuses(limit int) (expired int64, exhausted int64, err error) {
+	now := common.GetTimestamp()
+
+	// 1. 批量过期：status 为 1或2，且 expired_time 已过期
+	var expiredIds []int
+	err = DB.Model(&Token{}).
+		Where("status IN ?", []int{common.TokenStatusEnabled, common.TokenStatusDisabled}).
+		Where("expired_time != -1 AND expired_time < ?", now).
+		Limit(limit).
+		Pluck("id", &expiredIds).Error
+	if err != nil {
+		return
+	}
+	if len(expiredIds) > 0 {
+		result := DB.Model(&Token{}).Where("id IN ?", expiredIds).
+			Update("status", common.TokenStatusExpired)
+		expired = result.RowsAffected
+		refreshTokenCache(expiredIds)
+	}
+
+	// 2. 批量耗尽：status 为 1或2，且额度用尽
+	var exhaustedIds []int
+	err = DB.Model(&Token{}).
+		Where("status IN ?", []int{common.TokenStatusEnabled, common.TokenStatusDisabled}).
+		Where("unlimited_quota = false AND remain_quota <= 0").
+		Limit(limit).
+		Pluck("id", &exhaustedIds).Error
+	if err != nil {
+		return
+	}
+	if len(exhaustedIds) > 0 {
+		result := DB.Model(&Token{}).Where("id IN ?", exhaustedIds).
+			Update("status", common.TokenStatusExhausted)
+		exhausted = result.RowsAffected
+		refreshTokenCache(exhaustedIds)
+	}
+	return
+}
+
+// refreshTokenCache 批量刷新 Redis 缓存
+func refreshTokenCache(ids []int) {
+	if !common.RedisEnabled || len(ids) == 0 {
+		return
+	}
+	var tokens []*Token
+	if err := DB.Where("id IN ?", ids).Find(&tokens).Error; err != nil {
+		common.SysLog("failed to query tokens for cache refresh: " + err.Error())
+		return
+	}
+	for _, t := range tokens {
+		token := *t
+		gopool.Go(func() {
+			if err := cacheSetToken(token); err != nil {
+				common.SysLog("failed to refresh token cache: " + err.Error())
+			}
+		})
+	}
+}
+
+// StartTokenStatusUpdater 定时更新令牌状态（goroutine 入口）
+func StartTokenStatusUpdater() {
+	for {
+		time.Sleep(time.Duration(common.TokenStatusSyncFrequency) * time.Second)
+		expired, exhausted, err := UpdateExpiredTokenStatuses(100)
+		if err != nil {
+			common.SysLog("token status update error: " + err.Error())
+		} else if expired > 0 || exhausted > 0 {
+			common.SysLog(fmt.Sprintf("token status updated: expired=%d, exhausted=%d", expired, exhausted))
+		}
+	}
 }
 
 // BatchDeleteTokens 删除指定用户的一组令牌，返回成功删除数量

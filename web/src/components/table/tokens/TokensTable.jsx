@@ -46,10 +46,10 @@ const TokensTable = (tokensData) => {
     setEditingToken,
     setShowEdit,
     refresh,
+    onSort,
     t,
   } = tokensData;
 
-  // Get all columns
   const columns = useMemo(() => {
     return getTokensColumns({
       t,
@@ -61,6 +61,7 @@ const TokensTable = (tokensData) => {
       setEditingToken,
       setShowEdit,
       refresh,
+      onSort,
     });
   }, [
     t,
@@ -72,6 +73,7 @@ const TokensTable = (tokensData) => {
     setEditingToken,
     setShowEdit,
     refresh,
+    onSort,
   ]);
 
   // Handle compact mode by removing fixed positioning
@@ -92,6 +94,11 @@ const TokensTable = (tokensData) => {
       columns={tableColumns}
       dataSource={tokens}
       scroll={compactMode ? undefined : { x: 'max-content' }}
+      onChange={(data) => {
+        if (data && data.sorter && onSort) {
+          onSort(data.sorter);
+        }
+      }}
       pagination={{
         currentPage: activePage,
         pageSize: pageSize,

@@ -114,7 +114,8 @@ var IsMasterNode bool
 var requestInterval int
 var RequestInterval time.Duration
 
-var SyncFrequency int // unit is second
+var SyncFrequency             int // unit is second
+var TokenStatusSyncFrequency int // unit is second
 
 var BatchUpdateEnabled = false
 var BatchUpdateInterval int

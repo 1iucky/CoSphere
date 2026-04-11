@@ -64,17 +64,33 @@ func formatUserLogs(logs []*Log) {
 	}
 }
 
-func GetLogByKey(key string) (logs []*Log, err error) {
+type LogByKeyItem struct {
+	CreatedAt        int64  `json:"created_at"`
+	TokenName        string `json:"token_name"`
+	ModelName        string `json:"model_name"`
+	UseTime          int    `json:"use_time"`
+	IsStream         bool   `json:"is_stream"`
+	PromptTokens     int    `json:"prompt_tokens"`
+	CompletionTokens int    `json:"completion_tokens"`
+	Other            string `json:"other"`
+}
+
+func GetLogByKey(key string) (logs []*LogByKeyItem, err error) {
+	trimmedKey := strings.TrimPrefix(key, "sk-")
+	twentyFourHoursAgo := time.Now().Unix() - 86400
+	query := LOG_DB.Table("logs").
+		Select("logs.created_at, logs.token_name, logs.model_name, logs.use_time, logs.is_stream, logs.prompt_tokens, logs.completion_tokens, logs.other").
+		Where("logs.type = ?", LogTypeConsume).
+		Where("logs.created_at >= ?", twentyFourHoursAgo)
 	if os.Getenv("LOG_SQL_DSN") != "" {
 		var tk Token
-		if err = DB.Model(&Token{}).Where(logKeyCol+"=?", strings.TrimPrefix(key, "sk-")).First(&tk).Error; err != nil {
+		if err = DB.Model(&Token{}).Where(logKeyCol+"=?", trimmedKey).First(&tk).Error; err != nil {
 			return nil, err
 		}
-		err = LOG_DB.Model(&Log{}).Where("token_id=?", tk.Id).Find(&logs).Error
+		err = query.Where("logs.token_id = ?", tk.Id).Find(&logs).Error
 	} else {
-		err = LOG_DB.Joins("left join tokens on tokens.id = logs.token_id").Where("tokens.key = ?", strings.TrimPrefix(key, "sk-")).Find(&logs).Error
+		err = query.Joins("left join tokens on tokens.id = logs.token_id").Where("tokens.key = ?", trimmedKey).Find(&logs).Error
 	}
-	formatUserLogs(logs)
 	return logs, err
 }
 

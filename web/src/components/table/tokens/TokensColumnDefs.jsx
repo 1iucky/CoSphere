@@ -488,6 +488,7 @@ export const getTokensColumns = ({
   setEditingToken,
   setShowEdit,
   refresh,
+  onSort,
 }) => {
   return [
     {
@@ -530,6 +531,7 @@ export const getTokensColumns = ({
     {
       title: t('创建时间'),
       dataIndex: 'created_time',
+      sorter: true,
       render: (text, record, index) => {
         return <div>{renderTimestamp(text)}</div>;
       },
@@ -537,6 +539,7 @@ export const getTokensColumns = ({
     {
       title: t('过期时间'),
       dataIndex: 'expired_time',
+      sorter: true,
       render: (text, record, index) => {
         return (
           <div>

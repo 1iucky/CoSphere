@@ -21,6 +21,14 @@ import React, { useRef } from 'react';
 import { Form, Button } from '@douyinfe/semi-ui';
 import { IconSearch } from '@douyinfe/semi-icons';
 
+const statusOptions = [
+  { value: '', label: '全部状态' },
+  { value: '1', label: '已启用' },
+  { value: '2', label: '已禁用' },
+  { value: '3', label: '已过期' },
+  { value: '4', label: '已耗尽' },
+];
+
 const TokensFilters = ({
   formInitValues,
   setFormApi,
@@ -75,6 +83,21 @@ const TokensFilters = ({
             showClear
             pure
             size='small'
+          />
+        </div>
+
+        <div className='relative w-full md:w-36'>
+          <Form.Select
+            field='statusFilter'
+            placeholder={t('状态筛选')}
+            optionList={statusOptions.map((opt) => ({
+              ...opt,
+              label: t(opt.label),
+            }))}
+            showClear
+            pure
+            size='small'
+            style={{ width: '100%' }}
           />
         </div>
 

@@ -63,13 +63,15 @@ func ensureUserGroupsAccessible(c *gin.Context, groups []string) error {
 
 func GetAllTokens(c *gin.Context) {
 	userId := c.GetInt("id")
+	status, _ := strconv.Atoi(c.Query("status"))
+	orderBy := buildTokenOrderBy(c.Query("sort_field"), c.Query("sort_order"))
 	pageInfo := common.GetPageQuery(c)
-	tokens, err := model.GetAllUserTokens(userId, pageInfo.GetStartIdx(), pageInfo.GetPageSize())
+	tokens, err := model.GetAllUserTokens(userId, status, orderBy, pageInfo.GetStartIdx(), pageInfo.GetPageSize())
 	if err != nil {
 		common.ApiError(c, err)
 		return
 	}
-	total, _ := model.CountUserTokens(userId)
+	total, _ := model.CountUserTokens(userId, status)
 	pageInfo.SetTotal(int(total))
 	pageInfo.SetItems(tokens)
 	common.ApiSuccess(c, pageInfo)
@@ -80,7 +82,8 @@ func SearchTokens(c *gin.Context) {
 	userId := c.GetInt("id")
 	keyword := c.Query("keyword")
 	token := c.Query("token")
-	tokens, err := model.SearchUserTokens(userId, keyword, token)
+	status, _ := strconv.Atoi(c.Query("status"))
+	tokens, err := model.SearchUserTokens(userId, keyword, token, status)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -91,6 +94,28 @@ func SearchTokens(c *gin.Context) {
 		"data":    tokens,
 	})
 	return
+}
+
+// buildTokenOrderBy 根据排序字段和排序方向构建安全的 ORDER BY 子句
+func buildTokenOrderBy(sortField, sortOrder string) string {
+	allowedFields := map[string]string{
+		"created_time": "created_time",
+		"expired_time": "expired_time",
+		"id":           "id",
+		"name":         "name",
+		"status":       "status",
+		"used_quota":   "used_quota",
+		"remain_quota": "remain_quota",
+	}
+	field, ok := allowedFields[sortField]
+	if !ok {
+		return "id desc"
+	}
+	order := "desc"
+	if sortOrder == "ascend" {
+		order = "asc"
+	}
+	return field + " " + order
 }
 
 func GetToken(c *gin.Context) {
@@ -363,6 +388,21 @@ func UpdateToken(c *gin.Context) {
 			}
 		}
 	}
+
+	// 自动恢复：过期/耗尽的令牌在编辑时，若条件已解除，自动恢复为已启用
+	if cleanToken.Status == common.TokenStatusExpired || cleanToken.Status == common.TokenStatusExhausted {
+		canRecover := true
+		if cleanToken.ExpiredTime != -1 && cleanToken.ExpiredTime <= common.GetTimestamp() {
+			canRecover = false
+		}
+		if !cleanToken.UnlimitedQuota && cleanToken.RemainQuota <= 0 {
+			canRecover = false
+		}
+		if canRecover {
+			cleanToken.Status = common.TokenStatusEnabled
+		}
+	}
+
 	err = cleanToken.Update()
 	if err != nil {
 		common.ApiError(c, err)

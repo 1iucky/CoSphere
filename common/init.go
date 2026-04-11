@@ -88,6 +88,7 @@ func InitEnv() {
 
 	// Initialize variables with GetEnvOrDefault
 	SyncFrequency = GetEnvOrDefault("SYNC_FREQUENCY", 60)
+	TokenStatusSyncFrequency = GetEnvOrDefault("TOKEN_STATUS_SYNC_FREQUENCY", 300)
 	BatchUpdateInterval = GetEnvOrDefault("BATCH_UPDATE_INTERVAL", 5)
 	RelayTimeout = GetEnvOrDefault("RELAY_TIMEOUT", 0)
 
