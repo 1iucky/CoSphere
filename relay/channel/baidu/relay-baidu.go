@@ -150,9 +150,10 @@ func baiduHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respon
 		return types.NewError(err, types.ErrorCodeBadResponseBody), nil
 	}
 	if baiduResponse.ErrorMsg != "" {
-		return types.NewError(fmt.Errorf(baiduResponse.ErrorMsg), types.ErrorCodeBadResponseBody), nil
+		return types.NewError(fmt.Errorf("%s", baiduResponse.ErrorMsg), types.ErrorCodeBadResponseBody), nil
 	}
 	fullTextResponse := responseBaidu2OpenAI(&baiduResponse)
+	fullTextResponse.Model = relaycommon.ResponseModelName(info, "ernie-bot")
 	jsonResponse, err := json.Marshal(fullTextResponse)
 	if err != nil {
 		return types.NewError(err, types.ErrorCodeBadResponseBody), nil
@@ -177,9 +178,10 @@ func baiduEmbeddingHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *ht
 		return types.NewError(err, types.ErrorCodeBadResponseBody), nil
 	}
 	if baiduResponse.ErrorMsg != "" {
-		return types.NewError(fmt.Errorf(baiduResponse.ErrorMsg), types.ErrorCodeBadResponseBody), nil
+		return types.NewError(fmt.Errorf("%s", baiduResponse.ErrorMsg), types.ErrorCodeBadResponseBody), nil
 	}
 	fullTextResponse := embeddingResponseBaidu2OpenAI(&baiduResponse)
+	fullTextResponse.Model = relaycommon.ResponseModelName(info, "baidu-embedding")
 	jsonResponse, err := json.Marshal(fullTextResponse)
 	if err != nil {
 		return types.NewError(err, types.ErrorCodeBadResponseBody), nil

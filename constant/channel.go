@@ -59,6 +59,7 @@ const (
 	ChannelTypeMiniMaxCoding  = 59
 	ChannelTypeBaiduCoding    = 60
 	ChannelTypeMiniMaxGlobalCoding = 61
+	ChannelTypeXunfeiCoding       = 62
 	ChannelTypeDummy          // this one is only for count, do not add any channel after this
 
 )
@@ -125,7 +126,8 @@ var ChannelBaseURLs = []string{
 	"https://coding.dashscope.aliyuncs.com",     //58
 	"https://api.minimaxi.com",                  //59
 	"https://qianfan.baidubce.com",              //60
-	"https://api.minimax.io",                    //61
+	"https://api.minimax.io",                             //61
+	"https://maas-coding-api.cn-huabei-1.xf-yun.com",     //62
 }
 
 var ChannelTypeNames = map[int]string{
@@ -187,6 +189,7 @@ var ChannelTypeNames = map[int]string{
 	ChannelTypeMiniMaxCoding:  "MiniMaxCoding",
 	ChannelTypeBaiduCoding:    "BaiduCoding",
 	ChannelTypeMiniMaxGlobalCoding: "MiniMaxGlobalCoding",
+	ChannelTypeXunfeiCoding:       "XunfeiCoding",
 }
 
 func GetChannelTypeName(channelType int) string {

@@ -77,23 +77,17 @@ func palmStreamHandler(c *gin.Context, resp *http.Response) (*types.NewAPIError,
 		if len(palmResponse.Candidates) > 0 {
 			responseText = palmResponse.Candidates[0].Content
 		}
-		jsonResponse, err := json.Marshal(fullTextResponse)
-		if err != nil {
-			common.SysLog("error marshalling stream response: " + err.Error())
-			stopChan <- true
-			return
-		}
-		dataChan <- string(jsonResponse)
+		dataChan <- common.GetJsonString(fullTextResponse)
 		stopChan <- true
 	}()
 	helper.SetEventStreamHeaders(c)
 	c.Stream(func(w io.Writer) bool {
 		select {
 		case data := <-dataChan:
-			c.Render(-1, common.CustomEvent{Data: "data: " + data})
+			_ = helper.StringData(c, data)
 			return true
 		case <-stopChan:
-			c.Render(-1, common.CustomEvent{Data: "data: [DONE]"})
+			helper.Done(c)
 			return false
 		}
 	})
@@ -121,6 +115,7 @@ func palmHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respons
 		}, resp.StatusCode)
 	}
 	fullTextResponse := responsePaLM2OpenAI(&palmResponse)
+	fullTextResponse.Model = relaycommon.ResponseModelName(info, "palm2")
 	completionTokens := service.CountTextToken(palmResponse.Candidates[0].Content, info.UpstreamModelName)
 	usage := dto.Usage{
 		PromptTokens:     info.PromptTokens,

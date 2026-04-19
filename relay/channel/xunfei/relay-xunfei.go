@@ -14,6 +14,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
+	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/types"
@@ -143,15 +144,14 @@ func xunfeiStreamHandler(c *gin.Context, textRequest dto.GeneralOpenAIRequest, a
 			usage.CompletionTokens += xunfeiResponse.Payload.Usage.Text.CompletionTokens
 			usage.TotalTokens += xunfeiResponse.Payload.Usage.Text.TotalTokens
 			response := streamResponseXunfei2OpenAI(&xunfeiResponse)
-			jsonResponse, err := json.Marshal(response)
+			err := helper.ObjectData(c, response)
 			if err != nil {
 				common.SysLog("error marshalling stream response: " + err.Error())
 				return true
 			}
-			c.Render(-1, common.CustomEvent{Data: "data: " + string(jsonResponse)})
 			return true
 		case <-stopChan:
-			c.Render(-1, common.CustomEvent{Data: "data: [DONE]"})
+			helper.Done(c)
 			return false
 		}
 	})
@@ -191,6 +191,7 @@ func xunfeiHandler(c *gin.Context, textRequest dto.GeneralOpenAIRequest, appId s
 	xunfeiResponse.Payload.Choices.Text[0].Content = content
 
 	response := responseXunfei2OpenAI(&xunfeiResponse)
+	response.Model = relaycommon.ResponseModelNameFromContext(c, "SparkDesk")
 	jsonResponse, err := json.Marshal(response)
 	if err != nil {
 		return nil, types.NewError(err, types.ErrorCodeBadResponseBody)

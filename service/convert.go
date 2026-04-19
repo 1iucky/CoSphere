@@ -133,6 +133,10 @@ func ClaudeToOpenAIRequest(claudeRequest dto.ClaudeRequest, info *relaycommon.Re
 						CacheControl: mediaMsg.CacheControl,
 					}
 					mediaMessages = append(mediaMessages, message)
+				case "thinking":
+					if mediaMsg.Thinking != nil {
+						openAIMessage.ReasoningContent += *mediaMsg.Thinking
+					}
 				case "image":
 					// Handle image conversion (base64 to URL or keep as is)
 					imageData := fmt.Sprintf("data:%s;base64,%s", mediaMsg.Source.MediaType, mediaMsg.Source.Data)
@@ -183,7 +187,7 @@ func ClaudeToOpenAIRequest(claudeRequest dto.ClaudeRequest, info *relaycommon.Re
 				openAIMessage.SetMediaContent(mediaMessages)
 			}
 		}
-		if len(openAIMessage.ParseContent()) > 0 || len(openAIMessage.ToolCalls) > 0 {
+		if len(openAIMessage.ParseContent()) > 0 || len(openAIMessage.ToolCalls) > 0 || openAIMessage.ReasoningContent != "" {
 			openAIMessages = append(openAIMessages, openAIMessage)
 		}
 	}
@@ -205,7 +209,7 @@ func StreamResponseOpenAI2Claude(openAIResponse *dto.ChatCompletionsStreamRespon
 	if info.SendResponseCount == 1 {
 		msg := &dto.ClaudeMediaMessage{
 			Id:    openAIResponse.Id,
-			Model: openAIResponse.Model,
+			Model: relaycommon.ResponseModelName(info, openAIResponse.Model),
 			Type:  "message",
 			Role:  "assistant",
 			Usage: &dto.ClaudeUsage{
@@ -405,7 +409,7 @@ func ResponseOpenAI2Claude(openAIResponse *dto.OpenAITextResponse, info *relayco
 		Id:    openAIResponse.Id,
 		Type:  "message",
 		Role:  "assistant",
-		Model: openAIResponse.Model,
+		Model: relaycommon.ResponseModelName(info, openAIResponse.Model),
 	}
 	for _, choice := range openAIResponse.Choices {
 		stopReason = stopReasonOpenAI2Claude(choice.FinishReason)

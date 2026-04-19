@@ -152,15 +152,13 @@ func cohereStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 				}
 				responseText += cohereResp.Text
 			}
-			jsonStr, err := json.Marshal(openaiResp)
-			if err != nil {
+			if err := helper.ObjectData(c, openaiResp); err != nil {
 				common.SysLog("error marshalling stream response: " + err.Error())
 				return true
 			}
-			c.Render(-1, common.CustomEvent{Data: "data: " + string(jsonStr)})
 			return true
 		case <-stopChan:
-			c.Render(-1, common.CustomEvent{Data: "data: [DONE]"})
+			helper.Done(c)
 			return false
 		}
 	})
@@ -191,7 +189,7 @@ func cohereHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 	openaiResp.Id = cohereResp.ResponseId
 	openaiResp.Created = createdTime
 	openaiResp.Object = "chat.completion"
-	openaiResp.Model = info.UpstreamModelName
+	openaiResp.Model = relaycommon.DisplayResponseModelName(info)
 	openaiResp.Usage = usage
 
 	openaiResp.Choices = []dto.OpenAITextResponseChoice{

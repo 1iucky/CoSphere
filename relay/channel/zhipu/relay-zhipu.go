@@ -186,12 +186,11 @@ func zhipuStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.
 		select {
 		case data := <-dataChan:
 			response := streamResponseZhipu2OpenAI(data)
-			jsonResponse, err := json.Marshal(response)
+			err := helper.ObjectData(c, response)
 			if err != nil {
 				common.SysLog("error marshalling stream response: " + err.Error())
 				return true
 			}
-			c.Render(-1, common.CustomEvent{Data: "data: " + string(jsonResponse)})
 			return true
 		case data := <-metaChan:
 			var zhipuResponse ZhipuStreamMetaResponse
@@ -201,16 +200,15 @@ func zhipuStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.
 				return true
 			}
 			response, zhipuUsage := streamMetaResponseZhipu2OpenAI(&zhipuResponse)
-			jsonResponse, err := json.Marshal(response)
+			usage = zhipuUsage
+			err = helper.ObjectData(c, response)
 			if err != nil {
 				common.SysLog("error marshalling stream response: " + err.Error())
 				return true
 			}
-			usage = zhipuUsage
-			c.Render(-1, common.CustomEvent{Data: "data: " + string(jsonResponse)})
 			return true
 		case <-stopChan:
-			c.Render(-1, common.CustomEvent{Data: "data: [DONE]"})
+			helper.Done(c)
 			return false
 		}
 	})
@@ -236,6 +234,7 @@ func zhipuHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respon
 		}, resp.StatusCode)
 	}
 	fullTextResponse := responseZhipu2OpenAI(&zhipuResponse)
+	fullTextResponse.Model = relaycommon.ResponseModelName(info, "chatglm")
 	jsonResponse, err := json.Marshal(fullTextResponse)
 	if err != nil {
 		return nil, types.NewError(err, types.ErrorCodeBadResponseBody)

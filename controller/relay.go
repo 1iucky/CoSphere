@@ -20,6 +20,7 @@ import (
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
 	"github.com/QuantumNous/new-api/setting"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/bytedance/gopkg/util/gopool"
@@ -112,6 +113,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		newAPIError = types.NewError(err, types.ErrorCodeGenRelayInfoFailed)
 		return
 	}
+	relaycommon.SetRelayInfo(c, relayInfo)
 
 	meta := request.GetTokenCountMeta()
 	common.SetContextKey(c, constant.ContextKeyTokenCountMeta, meta)
@@ -271,6 +273,12 @@ func shouldRetry(c *gin.Context, openaiErr *types.NewAPIError, retryTimes int) b
 		return true
 	}
 	if openaiErr.StatusCode == http.StatusBadRequest {
+		errMsg := strings.ToLower(openaiErr.Error())
+		for _, keyword := range operation_setting.BadRequestRetryKeywords {
+			if keyword != "" && strings.Contains(errMsg, keyword) {
+				return true
+			}
+		}
 		return false
 	}
 	if openaiErr.StatusCode == 408 {

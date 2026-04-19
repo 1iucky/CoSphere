@@ -95,6 +95,7 @@ func xAIHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response
 		xaiResponse.Usage.CompletionTokens = xaiResponse.Usage.TotalTokens - xaiResponse.Usage.PromptTokens
 		xaiResponse.Usage.CompletionTokenDetails.TextTokens = xaiResponse.Usage.CompletionTokens - xaiResponse.Usage.CompletionTokenDetails.ReasoningTokens
 	}
+	xaiResponse.Model = relaycommon.ResponseModelName(info, xaiResponse.Model)
 
 	// new body
 	encodeJson, err := common.Marshal(xaiResponse)

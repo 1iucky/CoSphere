@@ -1131,7 +1131,7 @@ func GeminiChatHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.R
 		//}
 	}
 	fullTextResponse := responseGeminiChat2OpenAI(c, &geminiResponse)
-	fullTextResponse.Model = info.UpstreamModelName
+	fullTextResponse.Model = relaycommon.DisplayResponseModelName(info)
 	usage := dto.Usage{
 		PromptTokens:     geminiResponse.UsageMetadata.PromptTokenCount,
 		CompletionTokens: geminiResponse.UsageMetadata.CandidatesTokenCount,
@@ -1193,7 +1193,7 @@ func GeminiEmbeddingHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *h
 	openAIResponse := dto.OpenAIEmbeddingResponse{
 		Object: "list",
 		Data:   make([]dto.OpenAIEmbeddingResponseItem, 0, len(geminiResponse.Embeddings)),
-		Model:  info.UpstreamModelName,
+		Model:  relaycommon.DisplayResponseModelName(info),
 	}
 
 	for i, embedding := range geminiResponse.Embeddings {

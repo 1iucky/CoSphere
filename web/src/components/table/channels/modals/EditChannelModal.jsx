@@ -152,6 +152,15 @@ const EditChannelModal = (props) => {
     pass_through_body_enabled: false,
     system_prompt: '',
     system_prompt_override: false,
+    // 配额控制默认值
+    max_sessions: null,
+    session_idle_timeout: null,
+    base_rpm: null,
+    rpm_sticky_buffer: null,
+    enable_tls_fingerprint: false,
+    tls_fingerprint_profile_id: null,
+    enable_session_id_masking: false,
+    max_concurrency: null,
     settings: '',
     // 仅 Vertex: 密钥格式（存入 settings.vertex_key_type）
     vertex_key_type: 'json',
@@ -355,6 +364,15 @@ const EditChannelModal = (props) => {
     proxy: '',
     pass_through_body_enabled: false,
     system_prompt: '',
+    // 配额控制
+    max_sessions: null,
+    session_idle_timeout: null,
+    base_rpm: null,
+    rpm_sticky_buffer: null,
+    enable_tls_fingerprint: false,
+    tls_fingerprint_profile_id: null,
+    enable_session_id_masking: false,
+    max_concurrency: null,
   });
   const showApiConfigCard = true; // 控制是否显示 API 配置卡片
   const getInitValues = () => ({ ...originInputs });
@@ -536,6 +554,15 @@ const EditChannelModal = (props) => {
           data.system_prompt = parsedSettings.system_prompt || '';
           data.system_prompt_override =
             parsedSettings.system_prompt_override || false;
+          // 配额控制设置
+          data.max_sessions = parsedSettings.max_sessions || null;
+          data.session_idle_timeout = parsedSettings.session_idle_timeout || null;
+          data.base_rpm = parsedSettings.base_rpm || null;
+          data.rpm_sticky_buffer = parsedSettings.rpm_sticky_buffer || null;
+          data.enable_tls_fingerprint = parsedSettings.enable_tls_fingerprint || false;
+          data.tls_fingerprint_profile_id = parsedSettings.tls_fingerprint_profile_id || null;
+          data.enable_session_id_masking = parsedSettings.enable_session_id_masking || false;
+          data.max_concurrency = parsedSettings.max_concurrency || null;
         } catch (error) {
           console.error('解析渠道设置失败:', error);
           data.force_format = false;
@@ -620,6 +647,14 @@ const EditChannelModal = (props) => {
         pass_through_body_enabled: data.pass_through_body_enabled,
         system_prompt: data.system_prompt,
         system_prompt_override: data.system_prompt_override || false,
+        max_sessions: data.max_sessions || null,
+        session_idle_timeout: data.session_idle_timeout || null,
+        base_rpm: data.base_rpm || null,
+        rpm_sticky_buffer: data.rpm_sticky_buffer || null,
+        enable_tls_fingerprint: data.enable_tls_fingerprint || false,
+        tls_fingerprint_profile_id: data.tls_fingerprint_profile_id || null,
+        enable_session_id_masking: data.enable_session_id_masking || false,
+        max_concurrency: data.max_concurrency || null,
       });
       initialModelsRef.current = (data.models || [])
         .map((model) => (model || '').trim())
@@ -878,6 +913,14 @@ const EditChannelModal = (props) => {
       pass_through_body_enabled: false,
       system_prompt: '',
       system_prompt_override: false,
+      max_sessions: null,
+      session_idle_timeout: null,
+      base_rpm: null,
+      rpm_sticky_buffer: null,
+      enable_tls_fingerprint: false,
+      tls_fingerprint_profile_id: null,
+      enable_session_id_masking: false,
+      max_concurrency: null,
     });
     // 重置密钥模式状态
     setKeyMode('append');
@@ -1164,6 +1207,15 @@ const EditChannelModal = (props) => {
       pass_through_body_enabled: localInputs.pass_through_body_enabled || false,
       system_prompt: localInputs.system_prompt || '',
       system_prompt_override: localInputs.system_prompt_override || false,
+      // 配额控制
+      max_concurrency: localInputs.max_concurrency || null,
+      base_rpm: localInputs.base_rpm || null,
+      rpm_sticky_buffer: localInputs.rpm_sticky_buffer || null,
+      max_sessions: localInputs.max_sessions || null,
+      session_idle_timeout: localInputs.session_idle_timeout || null,
+      enable_tls_fingerprint: localInputs.enable_tls_fingerprint || false,
+      tls_fingerprint_profile_id: localInputs.tls_fingerprint_profile_id || null,
+      enable_session_id_masking: localInputs.enable_session_id_masking || false,
     };
     localInputs.setting = JSON.stringify(channelExtraSettings);
 
@@ -1209,6 +1261,15 @@ const EditChannelModal = (props) => {
     delete localInputs.system_prompt;
     delete localInputs.system_prompt_override;
     delete localInputs.is_enterprise_account;
+    // 清理配额控制临时字段（已序列化到 setting JSON 中）
+    delete localInputs.max_concurrency;
+    delete localInputs.base_rpm;
+    delete localInputs.rpm_sticky_buffer;
+    delete localInputs.max_sessions;
+    delete localInputs.session_idle_timeout;
+    delete localInputs.enable_tls_fingerprint;
+    delete localInputs.tls_fingerprint_profile_id;
+    delete localInputs.enable_session_id_masking;
     // 顶层的 vertex_key_type 不应发送给后端
     delete localInputs.vertex_key_type;
     // 顶层的 aws_key_type 不应发送给后端
@@ -2996,6 +3057,128 @@ const EditChannelModal = (props) => {
                       }
                       extraText={t(
                         '如果用户请求中包含系统提示词，则使用此设置拼接到用户的系统提示词前面',
+                      )}
+                    />
+                  </Card>
+
+                  {/* 配额控制卡片 */}
+                  <Card
+                    className='mt-4'
+                    style={{ borderRadius: '12px' }}
+                  >
+                    <div className='flex items-center mb-2'>
+                      <Avatar
+                        size='small'
+                        color='orange'
+                        className='mr-2 shadow-md'
+                      >
+                        <IconBolt size={16} />
+                      </Avatar>
+                      <div>
+                        <Text className='text-lg font-medium'>
+                          {t('配额控制')}
+                        </Text>
+                      </div>
+                    </div>
+
+                    <Form.InputNumber
+                      field='max_concurrency'
+                      label={t('最大并发数')}
+                      placeholder={t('留空表示不限制')}
+                      min={1}
+                      max={1000}
+                      onChange={(value) =>
+                        handleChannelSettingsChange('max_concurrency', value || null)
+                      }
+                      extraText={t('限制同一时间向该渠道发送的最大请求数，使用 Redis 分布式控制')}
+                      style={{ width: '100%' }}
+                    />
+
+                    <Form.InputNumber
+                      field='base_rpm'
+                      label={t('RPM 限制')}
+                      placeholder={t('留空表示不限制')}
+                      min={1}
+                      max={100000}
+                      onChange={(value) =>
+                        handleChannelSettingsChange('base_rpm', value || null)
+                      }
+                      extraText={t('每分钟最大请求数（Requests Per Minute），留空表示不限制')}
+                      style={{ width: '100%' }}
+                    />
+
+                    {channelSettings.base_rpm && (
+                      <Form.InputNumber
+                        field='rpm_sticky_buffer'
+                        label={t('RPM 粘性缓冲')}
+                        placeholder='3'
+                        min={1}
+                        max={100}
+                        onChange={(value) =>
+                          handleChannelSettingsChange('rpm_sticky_buffer', value || null)
+                        }
+                        extraText={t('为粘性会话（连续对话）预留的额外 RPM 缓冲配额')}
+                        style={{ width: '100%' }}
+                      />
+                    )}
+
+                    <Form.InputNumber
+                      field='max_sessions'
+                      label={t('最大会话数')}
+                      placeholder={t('留空表示不限制')}
+                      min={1}
+                      max={10000}
+                      onChange={(value) =>
+                        handleChannelSettingsChange('max_sessions', value || null)
+                      }
+                      extraText={t('限制该渠道同时活跃的最大会话数量')}
+                      style={{ width: '100%' }}
+                    />
+
+                    {channelSettings.max_sessions && (
+                      <Form.InputNumber
+                        field='session_idle_timeout'
+                        label={t('会话空闲超时（分钟）')}
+                        placeholder='5'
+                        min={1}
+                        max={1440}
+                        onChange={(value) =>
+                          handleChannelSettingsChange('session_idle_timeout', value || null)
+                        }
+                        extraText={t('超过此时间的无活动会话将自动清理')}
+                        style={{ width: '100%' }}
+                      />
+                    )}
+
+                    <Form.Switch
+                      field='enable_tls_fingerprint'
+                      label={t('TLS 指纹模拟')}
+                      checkedText={t('开')}
+                      uncheckedText={t('关')}
+                      onChange={(value) =>
+                        handleChannelSettingsChange(
+                          'enable_tls_fingerprint',
+                          value,
+                        )
+                      }
+                      extraText={t(
+                        '模拟 Node.js/Claude Code 客户端的 TLS 握手指纹，使上游服务识别为合法客户端',
+                      )}
+                    />
+
+                    <Form.Switch
+                      field='enable_session_id_masking'
+                      label={t('会话 ID 伪装')}
+                      checkedText={t('开')}
+                      uncheckedText={t('关')}
+                      onChange={(value) =>
+                        handleChannelSettingsChange(
+                          'enable_session_id_masking',
+                          value,
+                        )
+                      }
+                      extraText={t(
+                        '使用随机化的会话标识替换原始会话 ID，15分钟内保持一致',
                       )}
                     />
                   </Card>

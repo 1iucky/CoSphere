@@ -653,6 +653,8 @@
     "失败原因": "Raison de l'échec",
     "失败时自动禁用通道": "Désactiver automatiquement le canal en cas d'échec",
     "失败重试次数": "Nombre de tentatives en cas d'échec",
+    "400异常重试关键字": "400 error retry keywords",
+    "每行一个关键字，匹配到则400错误时允许重试": "One keyword per line, allows retry on 400 error when matched",
     "奖励说明": "Description de la récompense",
     "如：大带宽批量分析图片推荐": "par exemple, Recommandations d'analyse d'images par lots à large bande passante",
     "如：香港线路": "par exemple, Ligne de Hong Kong",

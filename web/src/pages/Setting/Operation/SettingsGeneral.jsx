@@ -51,6 +51,7 @@ export default function GeneralSettings(props) {
     'general_setting.custom_currency_exchange_rate': '',
     QuotaPerUnit: '',
     RetryTimes: '',
+    BadRequestRetryKeywords: '',
     USDExchangeRate: '',
     DisplayTokenStatEnabled: false,
     DefaultCollapseSidebar: false,
@@ -132,6 +133,12 @@ export default function GeneralSettings(props) {
         currentInputs[key] = props.options[key];
       }
     }
+    // 补充当前 inputs 模板中存在但 props.options 中缺失的字段默认值
+    for (let key in inputs) {
+      if (currentInputs[key] === undefined) {
+        currentInputs[key] = inputs[key];
+      }
+    }
     // 若旧字段存在且新字段缺失，则做一次兜底映射
     if (
       currentInputs['general_setting.quota_display_type'] === undefined &&
@@ -198,6 +205,15 @@ export default function GeneralSettings(props) {
                   placeholder={t('失败重试次数')}
                   onChange={handleFieldChange('RetryTimes')}
                   showClear
+                />
+              </Col>
+              <Col xs={24} sm={12} md={8} lg={8} xl={8}>
+                <Form.TextArea
+                  field={'BadRequestRetryKeywords'}
+                  label={t('400异常重试关键字')}
+                  placeholder={t('每行一个关键字，匹配到则400错误时允许重试')}
+                  onChange={handleFieldChange('BadRequestRetryKeywords')}
+                  rows={3}
                 />
               </Col>
               <Col xs={24} sm={12} md={8} lg={8} xl={8}>

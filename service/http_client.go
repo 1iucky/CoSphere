@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/pkg/tlsfingerprint"
 	"github.com/QuantumNous/new-api/setting/system_setting"
 
 	"golang.org/x/net/proxy"
@@ -19,6 +20,9 @@ var (
 	httpClient      *http.Client
 	proxyClientLock sync.Mutex
 	proxyClients    = make(map[string]*http.Client)
+
+	tlsClientLock sync.Mutex
+	tlsClients    = make(map[string]*http.Client)
 )
 
 func checkRedirect(req *http.Request, via []*http.Request) error {
@@ -131,4 +135,59 @@ func NewProxyHttpClient(proxyURL string) (*http.Client, error) {
 	default:
 		return nil, fmt.Errorf("unsupported proxy scheme: %s, must be http, https, socks5 or socks5h", parsedURL.Scheme)
 	}
+}
+
+// NewTLSFingerprintClient 创建支持 TLS 指纹模拟的 HTTP 客户端
+// profile 为 nil 时使用默认 Node.js 24.x 指纹
+// proxyURL 为空时直连，否则通过代理建立 TLS 隧道
+func NewTLSFingerprintClient(profile *tlsfingerprint.Profile, proxyURL string) (*http.Client, error) {
+	if profile == nil {
+		profile = tlsfingerprint.DefaultProfile()
+	}
+
+	// 缓存 key 由 profile 指针地址 + proxyURL 组成
+	cacheKey := fmt.Sprintf("tls|%p|%s", profile, proxyURL)
+
+	tlsClientLock.Lock()
+	if client, ok := tlsClients[cacheKey]; ok {
+		tlsClientLock.Unlock()
+		return client, nil
+	}
+	tlsClientLock.Unlock()
+
+	transport := &http.Transport{}
+
+	if proxyURL != "" {
+		parsedURL, err := url.Parse(proxyURL)
+		if err != nil {
+			return nil, fmt.Errorf("parse proxy URL: %w", err)
+		}
+
+		switch parsedURL.Scheme {
+		case "http", "https":
+			dialer := tlsfingerprint.NewHTTPProxyDialer(profile, parsedURL)
+			transport.DialTLSContext = dialer.DialTLSContext
+		case "socks5", "socks5h":
+			dialer := tlsfingerprint.NewSOCKS5ProxyDialer(profile, parsedURL)
+			transport.DialTLSContext = dialer.DialTLSContext
+		default:
+			return nil, fmt.Errorf("unsupported proxy scheme for TLS fingerprint: %s", parsedURL.Scheme)
+		}
+	} else {
+		dialer := tlsfingerprint.NewDialer(profile, nil)
+		transport.DialTLSContext = dialer.DialTLSContext
+	}
+
+	client := &http.Client{
+		Transport:     transport,
+		CheckRedirect: checkRedirect,
+	}
+	if common.RelayTimeout > 0 {
+		client.Timeout = time.Duration(common.RelayTimeout) * time.Second
+	}
+
+	tlsClientLock.Lock()
+	tlsClients[cacheKey] = client
+	tlsClientLock.Unlock()
+	return client, nil
 }

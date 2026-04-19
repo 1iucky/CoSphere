@@ -58,6 +58,9 @@ const (
 	ErrorCodeChannelAwsClientError        ErrorCode = "channel:aws_client_error"
 	ErrorCodeChannelInvalidKey            ErrorCode = "channel:invalid_key"
 	ErrorCodeChannelResponseTimeExceeded  ErrorCode = "channel:response_time_exceeded"
+	ErrorCodeChannelRPMExceeded           ErrorCode = "channel:rpm_exceeded"
+	ErrorCodeChannelConcurrencyExceeded   ErrorCode = "channel:concurrency_exceeded"
+	ErrorCodeChannelSessionLimitExceeded  ErrorCode = "channel:session_limit_exceeded"
 
 	// client request error
 	ErrorCodeReadRequestBodyFailed ErrorCode = "read_request_body_failed"

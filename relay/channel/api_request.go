@@ -255,9 +255,51 @@ func DoRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 	return doRequest(c, req, info)
 }
 func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http.Response, error) {
+	var concurrencyRelease func()
+
+	// 并发令牌释放必须作为第一个 defer，确保 panic 时也能释放
+	// Go 的 defer 在 panic unwind 时仍会执行，注册在最前面意味着最后才执行，
+	// 但 release 内部有 released 标志防重复调用，所以安全
+	defer func() {
+		if concurrencyRelease != nil {
+			concurrencyRelease()
+		}
+	}()
+
+	// 并发控制
+	if info.ChannelSetting.HasConcurrencyConfig() {
+		var ok bool
+		var acquireErr error
+		concurrencyRelease, ok, acquireErr = service.AcquireChannelConcurrency(info.ChannelId, &info.ChannelSetting)
+		if acquireErr != nil {
+			logger.LogError(c, "channel concurrency check failed: "+acquireErr.Error())
+			// Redis 错误降级，允许请求通过
+		} else if !ok {
+			return nil, types.NewError(nil, types.ErrorCodeChannelConcurrencyExceeded)
+		}
+	}
+
+	// RPM 限制
+	if info.ChannelSetting.HasRPMConfig() {
+		// TODO: 通过 context 传递 isSticky 状态，暂使用 false
+		allowed, err := service.CheckChannelRPM(info.ChannelId, &info.ChannelSetting, false)
+		if err != nil {
+			logger.LogError(c, "channel RPM check failed: "+err.Error())
+			// Redis 错误降级，允许请求通过
+		} else if !allowed {
+			return nil, types.NewError(nil, types.ErrorCodeChannelRPMExceeded)
+		}
+	}
+
 	var client *http.Client
 	var err error
-	if info.ChannelSetting.Proxy != "" {
+	// TLS 指纹模拟客户端优先级最高
+	if info.ChannelSetting.EnableTLSFingerprint {
+		client, err = service.NewTLSFingerprintClient(nil, info.ChannelSetting.Proxy)
+		if err != nil {
+			return nil, fmt.Errorf("new TLS fingerprint client failed: %w", err)
+		}
+	} else if info.ChannelSetting.Proxy != "" {
 		client, err = service.NewProxyHttpClient(info.ChannelSetting.Proxy)
 		if err != nil {
 			return nil, fmt.Errorf("new proxy http client failed: %w", err)

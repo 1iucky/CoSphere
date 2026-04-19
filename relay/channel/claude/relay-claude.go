@@ -751,13 +751,17 @@ func HandleClaudeResponseData(c *gin.Context, info *relaycommon.RelayInfo, claud
 	switch info.RelayFormat {
 	case types.RelayFormatOpenAI:
 		openaiResponse := ResponseClaude2OpenAI(requestMode, &claudeResponse)
+		openaiResponse.Model = relaycommon.ResponseModelName(info, openaiResponse.Model)
 		openaiResponse.Usage = *claudeInfo.Usage
 		responseData, err = json.Marshal(openaiResponse)
 		if err != nil {
 			return types.NewError(err, types.ErrorCodeBadResponseBody)
 		}
 	case types.RelayFormatClaude:
-		responseData = data
+		responseData, err = relaycommon.RewriteJSONModel(info, data, []string{"model"}, []string{"message", "model"})
+		if err != nil {
+			return types.NewError(err, types.ErrorCodeBadResponseBody)
+		}
 	}
 
 	if claudeResponse.Usage.ServerToolUse != nil && claudeResponse.Usage.ServerToolUse.WebSearchRequests > 0 {

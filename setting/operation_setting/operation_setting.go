@@ -30,3 +30,20 @@ func AutomaticDisableKeywordsFromString(s string) {
 		}
 	}
 }
+
+var BadRequestRetryKeywords = []string{}
+
+func BadRequestRetryKeywordsToString() string {
+	return strings.Join(BadRequestRetryKeywords, "\n")
+}
+
+func BadRequestRetryKeywordsFromString(s string) {
+	BadRequestRetryKeywords = []string{}
+	ak := strings.Split(s, "\n")
+	for _, k := range ak {
+		k = strings.TrimSpace(k)
+		if k != "" {
+			BadRequestRetryKeywords = append(BadRequestRetryKeywords, strings.ToLower(k))
+		}
+	}
+}

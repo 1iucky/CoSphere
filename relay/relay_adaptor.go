@@ -51,6 +51,7 @@ import (
 	"github.com/QuantumNous/new-api/relay/channel/zhipu_coding"
 	"github.com/QuantumNous/new-api/relay/channel/qwen_coding"
 	"github.com/QuantumNous/new-api/relay/channel/baidu_coding"
+	"github.com/QuantumNous/new-api/relay/channel/xunfei_coding"
 	"github.com/gin-gonic/gin"
 )
 
@@ -86,6 +87,8 @@ func GetAdaptor(apiType int) channel.Adaptor {
 		return &baidu_coding.Adaptor{}
 	case constant.APITypeMiniMaxGlobalCoding:
 		return &minimax_global_coding.Adaptor{}
+	case constant.APITypeXunfeiCoding:
+		return &xunfei_coding.Adaptor{}
 	case constant.APITypeOllama:
 		return &ollama.Adaptor{}
 	case constant.APITypePerplexity:

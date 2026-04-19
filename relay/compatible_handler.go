@@ -73,6 +73,7 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 	}
 	adaptor.Init(info)
 	var requestBody io.Reader
+	var jsonBody []byte
 
 	if model_setting.GetGlobalSettings().PassThroughRequestEnabled || info.ChannelSetting.PassThroughBodyEnabled {
 		body, err := common.GetRequestBody(c)
@@ -82,7 +83,7 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 		if common.DebugEnabled {
 			println("requestBody: ", string(body))
 		}
-		requestBody = bytes.NewBuffer(body)
+		jsonBody = body
 	} else {
 		convertedRequest, err := adaptor.ConvertOpenAIRequest(c, info, request)
 		if err != nil {
@@ -151,9 +152,30 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 		}
 
 		logger.LogDebug(c, fmt.Sprintf("text request body: %s", string(jsonData)))
-
-		requestBody = bytes.NewBuffer(jsonData)
+		jsonBody = jsonData
 	}
+
+	// 会话 ID 伪装：精确替换 user 字段
+	if info.ChannelSetting.EnableSessionIDMasking {
+		jsonBody = service.ApplyOpenAISessionIDMasking(jsonBody, info.ChannelId)
+	}
+
+	// 会话数控制：提取 sessionID 进行注册检查
+	if info.ChannelSetting.HasSessionConfig() {
+		sessionID := service.ExtractOpenAISessionID(jsonBody)
+		if sessionID == "" {
+			sessionID = fmt.Sprintf("user_%d", info.UserId)
+		}
+		allowed, err := service.RegisterSession(info.ChannelId, sessionID, &info.ChannelSetting)
+		if err != nil {
+			logger.LogError(c, "channel session register failed: "+err.Error())
+			// Redis 错误降级，允许通过
+		} else if !allowed {
+			return types.NewError(nil, types.ErrorCodeChannelSessionLimitExceeded)
+		}
+	}
+
+	requestBody = bytes.NewBuffer(jsonBody)
 
 	var httpResp *http.Response
 	resp, err := adaptor.DoRequest(c, info, requestBody)

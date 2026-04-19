@@ -268,6 +268,7 @@ func difyHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respons
 		Id:      difyResponse.ConversationId,
 		Object:  "chat.completion",
 		Created: common.GetTimestamp(),
+		Model:   relaycommon.DisplayResponseModelName(info),
 		Usage:   difyResponse.MetaData.Usage,
 	}
 	choice := dto.OpenAITextResponseChoice{

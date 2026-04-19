@@ -650,6 +650,8 @@
     "失败原因": "Lý do thất bại",
     "失败时自动禁用通道": "Tự động vô hiệu hóa kênh khi thất bại",
     "失败重试次数": "Số lần thử lại thất bại",
+    "400异常重试关键字": "400 error retry keywords",
+    "每行一个关键字，匹配到则400错误时允许重试": "One keyword per line, allows retry on 400 error when matched",
     "奖励说明": "Mô tả phần thưởng",
     "如：大带宽批量分析图片推荐": "ví dụ: Phân tích hàng loạt băng thông lớn đề xuất hình ảnh",
     "如：香港线路": "ví dụ: Tuyến Hồng Kông",

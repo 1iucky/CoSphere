@@ -265,6 +265,10 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 			bodyMap["usage"] = simpleResponse.Usage
 			responseBody, _ = common.Marshal(bodyMap)
 		}
+		responseBody, err = relaycommon.RewriteJSONModel(info, responseBody, []string{"model"})
+		if err != nil {
+			return nil, types.NewOpenAIError(err, types.ErrorCodeBadResponseBody, http.StatusInternalServerError)
+		}
 		if forceFormat {
 			responseBody, err = common.Marshal(simpleResponse)
 			if err != nil {

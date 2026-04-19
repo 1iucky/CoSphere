@@ -9,6 +9,7 @@ import (
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
 	"github.com/QuantumNous/new-api/logger"
+	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
@@ -94,7 +95,8 @@ func SetBillingHeaders(c *gin.Context, billingSource, skipReason string) {
 }
 
 func ClaudeData(c *gin.Context, resp dto.ClaudeResponse) error {
-	jsonData, err := common.Marshal(resp)
+	rewritten := relaycommon.RewriteResponseObjectModel(relaycommon.GetRelayInfo(c), resp)
+	jsonData, err := common.Marshal(rewritten)
 	if err != nil {
 		common.SysError("error marshalling stream response: " + err.Error())
 	} else {
@@ -106,18 +108,33 @@ func ClaudeData(c *gin.Context, resp dto.ClaudeResponse) error {
 }
 
 func ClaudeChunkData(c *gin.Context, resp dto.ClaudeResponse, data string) {
+	if info := relaycommon.GetRelayInfo(c); info != nil {
+		if rewritten, err := relaycommon.RewriteJSONModel(info, []byte(data), []string{"model"}, []string{"message", "model"}); err == nil {
+			data = string(rewritten)
+		}
+	}
 	c.Render(-1, common.CustomEvent{Data: fmt.Sprintf("event: %s\n", resp.Type)})
 	c.Render(-1, common.CustomEvent{Data: fmt.Sprintf("data: %s\n", data)})
 	_ = FlushWriter(c)
 }
 
 func ResponseChunkData(c *gin.Context, resp dto.ResponsesStreamResponse, data string) {
+	if info := relaycommon.GetRelayInfo(c); info != nil {
+		if rewritten, err := relaycommon.RewriteJSONModel(info, []byte(data), []string{"response", "model"}); err == nil {
+			data = string(rewritten)
+		}
+	}
 	c.Render(-1, common.CustomEvent{Data: fmt.Sprintf("event: %s\n", resp.Type)})
 	c.Render(-1, common.CustomEvent{Data: fmt.Sprintf("data: %s", data)})
 	_ = FlushWriter(c)
 }
 
 func StringData(c *gin.Context, str string) error {
+	if info := relaycommon.GetRelayInfo(c); info != nil {
+		if rewritten, err := relaycommon.RewriteJSONModel(info, []byte(str), []string{"model"}, []string{"response", "model"}, []string{"message", "model"}); err == nil {
+			str = string(rewritten)
+		}
+	}
 	//str = strings.TrimPrefix(str, "data: ")
 	//str = strings.TrimSuffix(str, "\r")
 	c.Render(-1, common.CustomEvent{Data: "data: " + str})
@@ -135,7 +152,8 @@ func ObjectData(c *gin.Context, object interface{}) error {
 	if object == nil {
 		return errors.New("object is nil")
 	}
-	jsonData, err := common.Marshal(object)
+	rewritten := relaycommon.RewriteResponseObjectModel(relaycommon.GetRelayInfo(c), object)
+	jsonData, err := common.Marshal(rewritten)
 	if err != nil {
 		return fmt.Errorf("error marshalling object: %w", err)
 	}

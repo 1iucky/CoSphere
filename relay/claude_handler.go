@@ -10,6 +10,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/logger"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relay/helper"
 	"github.com/QuantumNous/new-api/service"
@@ -99,12 +100,13 @@ func ClaudeHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *typ
 	}
 
 	var requestBody io.Reader
+	var jsonBody []byte
 	if model_setting.GetGlobalSettings().PassThroughRequestEnabled || info.ChannelSetting.PassThroughBodyEnabled {
 		body, err := common.GetRequestBody(c)
 		if err != nil {
 			return types.NewErrorWithStatusCode(err, types.ErrorCodeReadRequestBodyFailed, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
 		}
-		requestBody = bytes.NewBuffer(body)
+		jsonBody = body
 	} else {
 		convertedRequest, err := adaptor.ConvertClaudeRequest(c, info, request)
 		if err != nil {
@@ -132,8 +134,30 @@ func ClaudeHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *typ
 		if common.DebugEnabled {
 			println("requestBody: ", string(jsonData))
 		}
-		requestBody = bytes.NewBuffer(jsonData)
+		jsonBody = jsonData
 	}
+
+	// 会话 ID 伪装：精确替换 metadata.user_id，参考 sub2api 的 RewriteUserIDWithMasking
+	if info.ChannelSetting.EnableSessionIDMasking {
+		jsonBody = service.ApplyClaudeSessionIDMasking(jsonBody, info.ChannelId)
+	}
+
+	// 会话数控制：提取 sessionID 进行注册检查
+	if info.ChannelSetting.HasSessionConfig() {
+		sessionID := service.ExtractClaudeSessionID(jsonBody)
+		if sessionID == "" {
+			sessionID = fmt.Sprintf("user_%d", info.UserId)
+		}
+		allowed, err := service.RegisterSession(info.ChannelId, sessionID, &info.ChannelSetting)
+		if err != nil {
+			logger.LogError(c, "channel session register failed: "+err.Error())
+			// Redis 错误降级，允许通过
+		} else if !allowed {
+			return types.NewError(nil, types.ErrorCodeChannelSessionLimitExceeded)
+		}
+	}
+
+	requestBody = bytes.NewBuffer(jsonBody)
 
 	statusCodeMappingStr := c.GetString("status_code_mapping")
 	var httpResp *http.Response

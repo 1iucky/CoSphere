@@ -114,6 +114,11 @@ export const CHANNEL_OPTIONS = [
     label: 'MiniMax 国际版 Coding',
   },
   {
+    value: 62,
+    color: 'blue',
+    label: '讯飞星辰 Coding',
+  },
+  {
     value: 27,
     color: 'blue',
     label: 'Perplexity',
