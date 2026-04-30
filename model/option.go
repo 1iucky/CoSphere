@@ -110,6 +110,9 @@ func InitOptionMap() {
 	common.OptionMap["ModelRequestRateLimitCount"] = strconv.Itoa(setting.ModelRequestRateLimitCount)
 	common.OptionMap["ModelRequestRateLimitDurationMinutes"] = strconv.Itoa(setting.ModelRequestRateLimitDurationMinutes)
 	common.OptionMap["ModelRequestRateLimitSuccessCount"] = strconv.Itoa(setting.ModelRequestRateLimitSuccessCount)
+	common.OptionMap["TokenQueryRateLimitEnabled"] = strconv.FormatBool(common.TokenQueryRateLimitEnable)
+	common.OptionMap["TokenQueryRateLimitCount"] = strconv.Itoa(common.TokenQueryRateLimitCount)
+	common.OptionMap["TokenQueryRateLimitDurationSeconds"] = strconv.FormatInt(common.TokenQueryRateLimitDurationSeconds, 10)
 	common.OptionMap["ModelRequestRateLimitGroup"] = setting.ModelRequestRateLimitGroup2JSONString()
 	common.OptionMap["ModelRequestRateLimitScope"] = setting.ModelRequestRateLimitScope
 	common.OptionMap["ModelRequestConcurrencyLimitUserGroup"] = setting.ModelRequestConcurrencyLimitUserGroup2JSONString()
@@ -421,6 +424,12 @@ func updateOptionMap(key string, value string) (err error) {
 		setting.ModelRequestRateLimitDurationMinutes, _ = strconv.Atoi(value)
 	case "ModelRequestRateLimitSuccessCount":
 		setting.ModelRequestRateLimitSuccessCount, _ = strconv.Atoi(value)
+	case "TokenQueryRateLimitEnabled":
+		common.TokenQueryRateLimitEnable = value == "true"
+	case "TokenQueryRateLimitCount":
+		common.TokenQueryRateLimitCount, _ = strconv.Atoi(value)
+	case "TokenQueryRateLimitDurationSeconds":
+		common.TokenQueryRateLimitDurationSeconds, _ = strconv.ParseInt(value, 10, 64)
 	case "ModelRequestRateLimitGroup":
 		err = setting.UpdateModelRequestRateLimitGroupByJSONString(value)
 	case "ModelRequestRateLimitScope":

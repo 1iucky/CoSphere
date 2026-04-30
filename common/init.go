@@ -108,6 +108,9 @@ func InitEnv() {
 	CriticalRateLimitEnable = GetEnvOrDefaultBool("CRITICAL_RATE_LIMIT_ENABLE", true)
 	CriticalRateLimitNum = GetEnvOrDefault("CRITICAL_RATE_LIMIT", 20)
 	CriticalRateLimitDuration = int64(GetEnvOrDefault("CRITICAL_RATE_LIMIT_DURATION", 20*60))
+	TokenQueryRateLimitEnable = GetEnvOrDefaultBool("TOKEN_QUERY_RATE_LIMIT_ENABLE", true)
+	TokenQueryRateLimitCount = GetEnvOrDefault("TOKEN_QUERY_RATE_LIMIT_COUNT", 5)
+	TokenQueryRateLimitDurationSeconds = int64(GetEnvOrDefault("TOKEN_QUERY_RATE_LIMIT_DURATION_SECONDS", 60))
 	initConstantEnv()
 }
 

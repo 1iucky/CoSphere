@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 
 import React from 'react';
-import { Typography } from '@douyinfe/semi-ui';
+import { Button, Space, Typography } from '@douyinfe/semi-ui';
 import { Key } from 'lucide-react';
 import CompactModeToggle from '../../common/ui/CompactModeToggle';
 
@@ -32,11 +32,22 @@ const TokensDescription = ({ compactMode, setCompactMode, t }) => {
         <Text>{t('令牌管理')}</Text>
       </div>
 
-      <CompactModeToggle
-        compactMode={compactMode}
-        setCompactMode={setCompactMode}
-        t={t}
-      />
+      <Space>
+        <Button
+          theme='light'
+          type='primary'
+          onClick={() =>
+            window.open('/token/query', '_blank', 'noopener,noreferrer')
+          }
+        >
+          {t('令牌用量查询')}
+        </Button>
+        <CompactModeToggle
+          compactMode={compactMode}
+          setCompactMode={setCompactMode}
+          t={t}
+        />
+      </Space>
     </div>
   );
 };

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -20,8 +21,8 @@ import (
 type Log struct {
 	Id               int    `json:"id" gorm:"index:idx_created_at_id,priority:1"`
 	UserId           int    `json:"user_id" gorm:"index"`
-	CreatedAt        int64  `json:"created_at" gorm:"bigint;index:idx_created_at_id,priority:2;index:idx_created_at_type"`
-	Type             int    `json:"type" gorm:"index:idx_created_at_type"`
+	CreatedAt        int64  `json:"created_at" gorm:"bigint;index:idx_created_at_id,priority:2;index:idx_created_at_type;index:idx_logs_token_type_created_at,priority:3"`
+	Type             int    `json:"type" gorm:"index:idx_created_at_type;index:idx_logs_token_type_created_at,priority:2"`
 	Content          string `json:"content"`
 	Username         string `json:"username" gorm:"index;index:index_username_model_name,priority:2;default:''"`
 	TokenName        string `json:"token_name" gorm:"index;default:''"`
@@ -33,7 +34,7 @@ type Log struct {
 	IsStream         bool   `json:"is_stream"`
 	ChannelId        int    `json:"channel" gorm:"index"`
 	ChannelName      string `json:"channel_name" gorm:"->"`
-	TokenId          int    `json:"token_id" gorm:"default:0;index"`
+	TokenId          int    `json:"token_id" gorm:"default:0;index;index:idx_logs_token_type_created_at,priority:1"`
 	Group            string `json:"group" gorm:"index"`
 	Ip               string `json:"ip" gorm:"index;default:''"`
 	Other            string `json:"other"`
@@ -73,6 +74,150 @@ type LogByKeyItem struct {
 	PromptTokens     int    `json:"prompt_tokens"`
 	CompletionTokens int    `json:"completion_tokens"`
 	Other            string `json:"other"`
+}
+
+type TokenUsageDetailItem struct {
+	CreatedAt        int64  `json:"created_at"`
+	TokenName        string `json:"token_name"`
+	ModelName        string `json:"model_name"`
+	UseTime          int    `json:"use_time"`
+	IsStream         bool   `json:"is_stream"`
+	PromptTokens     int    `json:"prompt_tokens"`
+	CompletionTokens int    `json:"completion_tokens"`
+	Content          string `json:"content"`
+}
+
+type TokenUsageDailyModelStat struct {
+	ModelName string `json:"model_name"`
+	CallCount int    `json:"call_count"`
+}
+
+type TokenUsageDailyStat struct {
+	Date            string                      `json:"date"`
+	CallCount       int                         `json:"call_count"`
+	ModelCallCounts []*TokenUsageDailyModelStat `json:"model_call_counts"`
+}
+
+type tokenUsageDailyRow struct {
+	Date      string `json:"date"`
+	ModelName string `json:"model_name"`
+	CallCount int    `json:"call_count"`
+}
+
+func getTokenByQueryKey(key string) (*Token, error) {
+	trimmedKey := strings.TrimSpace(strings.TrimPrefix(key, "sk-"))
+	if trimmedKey == "" {
+		return nil, fmt.Errorf("未提供令牌")
+	}
+	var token Token
+	if err := DB.Model(&Token{}).Where(logKeyCol+"=?", trimmedKey).First(&token).Error; err != nil {
+		return nil, fmt.Errorf("无效的令牌")
+	}
+	return &token, nil
+}
+
+func getLocalDayRange(base time.Time) (int64, int64) {
+	dayStart := time.Date(base.Year(), base.Month(), base.Day(), 0, 0, 0, 0, base.Location())
+	nextDayStart := dayStart.Add(24 * time.Hour)
+	return dayStart.Unix(), nextDayStart.Unix()
+}
+
+func getTokenUsageDailyDateExpr() string {
+	if LOG_DB != nil {
+		switch LOG_DB.Dialector.Name() {
+		case common.DatabaseTypeMySQL:
+			return "DATE_FORMAT(FROM_UNIXTIME(created_at), '%Y-%m-%d')"
+		case common.DatabaseTypePostgreSQL:
+			return "TO_CHAR(TO_TIMESTAMP(created_at), 'YYYY-MM-DD')"
+		case common.DatabaseTypeSQLite:
+			return "strftime('%Y-%m-%d', datetime(created_at, 'unixepoch', 'localtime'))"
+		}
+	}
+	switch common.LogSqlType {
+	case common.DatabaseTypeMySQL:
+		return "DATE_FORMAT(FROM_UNIXTIME(created_at), '%Y-%m-%d')"
+	case common.DatabaseTypePostgreSQL:
+		return "TO_CHAR(TO_TIMESTAMP(created_at), 'YYYY-MM-DD')"
+	default:
+		return "strftime('%Y-%m-%d', datetime(created_at, 'unixepoch', 'localtime'))"
+	}
+}
+
+func GetTokenUsageOverview(key string, startIdx int, pageSize int) (details []*TokenUsageDetailItem, total int64, dailyStats []*TokenUsageDailyStat, tokenName string, err error) {
+	token, err := getTokenByQueryKey(key)
+	if err != nil {
+		return nil, 0, nil, "", err
+	}
+	tokenName = token.Name
+
+	now := time.Now().In(time.Local)
+	todayStart, tomorrowStart := getLocalDayRange(now)
+	sevenDayStart, _ := getLocalDayRange(now.AddDate(0, 0, -6))
+
+	baseDetailQuery := LOG_DB.Table("logs").
+		Where("token_id = ?", token.Id).
+		Where("type = ?", LogTypeConsume).
+		Where("created_at >= ? AND created_at < ?", todayStart, tomorrowStart)
+
+	if err = baseDetailQuery.Session(&gorm.Session{}).Count(&total).Error; err != nil {
+		return nil, 0, nil, tokenName, err
+	}
+
+	if err = baseDetailQuery.Session(&gorm.Session{}).
+		Select("created_at, token_name, model_name, use_time, is_stream, prompt_tokens, completion_tokens, content").
+		Order("created_at desc").
+		Limit(pageSize).
+		Offset(startIdx).
+		Find(&details).Error; err != nil {
+		return nil, 0, nil, tokenName, err
+	}
+
+	rows := make([]tokenUsageDailyRow, 0)
+	dateExpr := getTokenUsageDailyDateExpr()
+	if err = LOG_DB.Table("logs").
+		Select(dateExpr+" AS date, model_name, COUNT(*) AS call_count").
+		Where("token_id = ?", token.Id).
+		Where("type = ?", LogTypeConsume).
+		Where("created_at >= ? AND created_at < ?", sevenDayStart, tomorrowStart).
+		Group(dateExpr + ", model_name").
+		Scan(&rows).Error; err != nil {
+		return nil, 0, nil, tokenName, err
+	}
+
+	statsMap := make(map[string]*TokenUsageDailyStat, 7)
+	for i := 0; i < 7; i++ {
+		currentDay := now.AddDate(0, 0, -i)
+		dateKey := currentDay.Format("2006-01-02")
+		statsMap[dateKey] = &TokenUsageDailyStat{
+			Date:            dateKey,
+			CallCount:       0,
+			ModelCallCounts: make([]*TokenUsageDailyModelStat, 0),
+		}
+		dailyStats = append(dailyStats, statsMap[dateKey])
+	}
+
+	for _, row := range rows {
+		dayStat, ok := statsMap[row.Date]
+		if !ok {
+			continue
+		}
+		dayStat.CallCount += row.CallCount
+		dayStat.ModelCallCounts = append(dayStat.ModelCallCounts, &TokenUsageDailyModelStat{
+			ModelName: row.ModelName,
+			CallCount: row.CallCount,
+		})
+	}
+
+	for _, dayStat := range dailyStats {
+		sort.Slice(dayStat.ModelCallCounts, func(i, j int) bool {
+			if dayStat.ModelCallCounts[i].CallCount == dayStat.ModelCallCounts[j].CallCount {
+				return dayStat.ModelCallCounts[i].ModelName < dayStat.ModelCallCounts[j].ModelName
+			}
+			return dayStat.ModelCallCounts[i].CallCount > dayStat.ModelCallCounts[j].CallCount
+		})
+	}
+
+	return details, total, dailyStats, tokenName, nil
 }
 
 func GetLogByKey(key string) (logs []*LogByKeyItem, err error) {

@@ -38,6 +38,9 @@ export default function RequestRateLimit(props) {
     ModelRequestRateLimitCount: -1,
     ModelRequestRateLimitSuccessCount: 1000,
     ModelRequestRateLimitDurationMinutes: 1,
+    TokenQueryRateLimitEnabled: true,
+    TokenQueryRateLimitCount: 5,
+    TokenQueryRateLimitDurationSeconds: 60,
     ModelRequestRateLimitGroup: '',
     ModelRequestRateLimitScope: 'user',
     ModelRequestConcurrencyLimitEnabled: false,
@@ -262,6 +265,61 @@ export default function RequestRateLimit(props) {
               </Col>
             </Row>
           </Form.Section>
+          <Form.Section text={t('令牌查询页面限频')}>
+            <Row gutter={16}>
+              <Col xs={24} sm={12} md={8} lg={8} xl={8}>
+                <Form.Switch
+                  field={'TokenQueryRateLimitEnabled'}
+                  label={t('启用按令牌查询页面接口限频')}
+                  size='default'
+                  checkedText='｜'
+                  uncheckedText='〇'
+                  onChange={(value) => {
+                    setInputs({
+                      ...inputs,
+                      TokenQueryRateLimitEnabled: value,
+                    });
+                  }}
+                />
+              </Col>
+            </Row>
+            <Row gutter={16}>
+              <Col xs={24} sm={12} md={8} lg={8} xl={8}>
+                <Form.InputNumber
+                  label={t('每周期最多请求次数')}
+                  step={1}
+                  min={1}
+                  max={100000}
+                  suffix={t('次')}
+                  extraText={t('默认同一客户端 1 分钟最多 5 次')}
+                  field={'TokenQueryRateLimitCount'}
+                  onChange={(value) =>
+                    setInputs({
+                      ...inputs,
+                      TokenQueryRateLimitCount: String(value),
+                    })
+                  }
+                />
+              </Col>
+              <Col xs={24} sm={12} md={8} lg={8} xl={8}>
+                <Form.InputNumber
+                  label={t('限制周期')}
+                  step={1}
+                  min={1}
+                  max={3600}
+                  suffix={t('秒')}
+                  extraText={t('按客户端指纹（IP + 设备标识）限频')}
+                  field={'TokenQueryRateLimitDurationSeconds'}
+                  onChange={(value) =>
+                    setInputs({
+                      ...inputs,
+                      TokenQueryRateLimitDurationSeconds: String(value),
+                    })
+                  }
+                />
+              </Col>
+            </Row>
+          </Form.Section>
           <Form.Section text={t('模型请求并发限制')}>
             <Row gutter={16}>
               <Col xs={24} sm={12} md={8} lg={8} xl={8}>
@@ -284,9 +342,7 @@ export default function RequestRateLimit(props) {
               <Col xs={24} sm={16}>
                 <Form.TextArea
                   label={t('用户并发限制')}
-                  placeholder={t(
-                    '{\n  "default": 3,\n  "vip": 5\n}',
-                  )}
+                  placeholder={t('{\n  "default": 3,\n  "vip": 5\n}')}
                   field={'ModelRequestConcurrencyLimitUserGroup'}
                   autosize={{ minRows: 4, maxRows: 15 }}
                   trigger='blur'
@@ -302,13 +358,9 @@ export default function RequestRateLimit(props) {
                       <p>{t('说明：')}</p>
                       <ul>
                         <li>
-                          {t(
-                            '使用 JSON 对象格式，格式为：{"组名": 并发数}',
-                          )}
+                          {t('使用 JSON 对象格式，格式为：{"组名": 并发数}')}
                         </li>
-                        <li>
-                          {t('示例：{"default": 3, "vip": 5}。')}
-                        </li>
+                        <li>{t('示例：{"default": 3, "vip": 5}。')}</li>
                         <li>{t('并发数必须大于等于0，0代表不限制。')}</li>
                         <li>{t('按用户ID维度分别统计并发数。')}</li>
                       </ul>
@@ -343,14 +395,16 @@ export default function RequestRateLimit(props) {
                       <p>{t('说明：')}</p>
                       <ul>
                         <li>
-                          {t(
-                            '使用 JSON 对象格式，格式为：{"组名": 并发数}',
-                          )}
+                          {t('使用 JSON 对象格式，格式为：{"组名": 并发数}')}
                         </li>
                         <li>{t('示例：{"default": 2}。')}</li>
                         <li>{t('并发数必须大于等于0，0代表不限制。')}</li>
                         <li>{t('按令牌维度分别统计并发数。')}</li>
-                        <li>{t('用户与令牌并发限制会同时校验，任一超限都会拒绝。')}</li>
+                        <li>
+                          {t(
+                            '用户与令牌并发限制会同时校验，任一超限都会拒绝。',
+                          )}
+                        </li>
                       </ul>
                     </div>
                   }

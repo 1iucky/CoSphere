@@ -114,7 +114,7 @@ var IsMasterNode bool
 var requestInterval int
 var RequestInterval time.Duration
 
-var SyncFrequency             int // unit is second
+var SyncFrequency int            // unit is second
 var TokenStatusSyncFrequency int // unit is second
 
 var BatchUpdateEnabled = false
@@ -163,6 +163,10 @@ var (
 	CriticalRateLimitEnable   bool
 	CriticalRateLimitNum            = 20
 	CriticalRateLimitDuration int64 = 20 * 60
+
+	TokenQueryRateLimitEnable                = true
+	TokenQueryRateLimitCount                 = 5
+	TokenQueryRateLimitDurationSeconds int64 = 60
 
 	UploadRateLimitNum            = 10
 	UploadRateLimitDuration int64 = 60
@@ -230,13 +234,13 @@ const (
 
 // 计费周期类型
 const (
-	BillingCycleMonthly    = "monthly"     // 按月（1个月）
-	BillingCycleYearly     = "yearly"      // 按年（12个月）
-	BillingCycleCustom     = "custom"      // 自定义周期
-	BillingCycleFiveHours  = "five_hours"  // 5小时
-	BillingCycleDay        = "day"         // 按天
-	BillingCycleWeek       = "week"        // 按周
-	BillingCycleMonth      = "month"       // 按月（通用）
+	BillingCycleMonthly   = "monthly"    // 按月（1个月）
+	BillingCycleYearly    = "yearly"     // 按年（12个月）
+	BillingCycleCustom    = "custom"     // 自定义周期
+	BillingCycleFiveHours = "five_hours" // 5小时
+	BillingCycleDay       = "day"        // 按天
+	BillingCycleWeek      = "week"       // 按周
+	BillingCycleMonth     = "month"      // 按月（通用）
 )
 
 // 限额周期类型（滚动窗口）
@@ -287,10 +291,10 @@ const (
 
 // 优惠券作用域
 const (
-	CouponScopeQuota              = "quota"        // 额度券
-	CouponScopePlan               = "plan"         // 套餐券
-	CouponScopeSubscription       = "subscription" // 订阅券
-	CouponScopeWallet             = "wallet"        // 余额充值
+	CouponScopeQuota              = "quota"               // 额度券
+	CouponScopePlan               = "plan"                // 套餐券
+	CouponScopeSubscription       = "subscription"        // 订阅券
+	CouponScopeWallet             = "wallet"              // 余额充值
 	CouponScopeWalletSubscription = "wallet_subscription" // 充值+订阅均可
 )
 
@@ -387,13 +391,13 @@ const (
 
 // 订阅系统配置项默认值（将在 2.1.4 中使用）
 const (
-	DefaultSubscriptionAutoWalletFallback = false   // 默认不自动兜底
-	DefaultSubscriptionExpiryNoticeDays   = 7       // 默认到期前7天提醒
-	DefaultSubscriptionMaxPerUser         = 10      // 默认每用户最多10个订阅
-	DefaultSubscriptionQuotaLowThreshold  = 0.2     // 默认额度低于20%提醒
-	DefaultSubscriptionV2Enabled          = false   // 默认订阅系统关闭
-	DefaultSubscriptionGrayscaleThreshold = 0       // 默认灰度阈值0%（关闭灰度）
-	DefaultSubscriptionGrayscaleMode      = "off"   // 默认灰度模式：off/percentage/user_id
+	DefaultSubscriptionAutoWalletFallback = false // 默认不自动兜底
+	DefaultSubscriptionExpiryNoticeDays   = 7     // 默认到期前7天提醒
+	DefaultSubscriptionMaxPerUser         = 10    // 默认每用户最多10个订阅
+	DefaultSubscriptionQuotaLowThreshold  = 0.2   // 默认额度低于20%提醒
+	DefaultSubscriptionV2Enabled          = false // 默认订阅系统关闭
+	DefaultSubscriptionGrayscaleThreshold = 0     // 默认灰度阈值0%（关闭灰度）
+	DefaultSubscriptionGrayscaleMode      = "off" // 默认灰度模式：off/percentage/user_id
 )
 
 // Token 订阅偏好设置（对应 tokens.subscription_preferred 字段）
@@ -406,13 +410,13 @@ const (
 
 // 订阅系统配置键（options 表键名）
 const (
-	OptionKeySubscriptionAutoWalletDefault  = "SUBSCRIPTION_AUTO_WALLET_DEFAULT"  // 自动兜底默认值
-	OptionKeySubscriptionExpiryNoticeDays   = "SUBSCRIPTION_EXPIRY_NOTICE_DAYS"   // 到期提醒天数
-	OptionKeySubscriptionMaxPerUser         = "SUBSCRIPTION_MAX_PER_USER"         // 每用户最大订阅数
-	OptionKeySubscriptionQuotaLowThreshold  = "SUBSCRIPTION_QUOTA_LOW_THRESHOLD"  // 额度低阈值
-	OptionKeySubscriptionV2Enabled          = "SUBSCRIPTION_V2_ENABLED"           // 订阅系统启用开关
-	OptionKeySubscriptionGrayscaleThreshold = "SUBSCRIPTION_GRAYSCALE_THRESHOLD"  // 灰度发布阈值（0-100）
-	OptionKeySubscriptionGrayscaleMode      = "SUBSCRIPTION_GRAYSCALE_MODE"       // 灰度模式：off/percentage/user_id
+	OptionKeySubscriptionAutoWalletDefault  = "SUBSCRIPTION_AUTO_WALLET_DEFAULT" // 自动兜底默认值
+	OptionKeySubscriptionExpiryNoticeDays   = "SUBSCRIPTION_EXPIRY_NOTICE_DAYS"  // 到期提醒天数
+	OptionKeySubscriptionMaxPerUser         = "SUBSCRIPTION_MAX_PER_USER"        // 每用户最大订阅数
+	OptionKeySubscriptionQuotaLowThreshold  = "SUBSCRIPTION_QUOTA_LOW_THRESHOLD" // 额度低阈值
+	OptionKeySubscriptionV2Enabled          = "SUBSCRIPTION_V2_ENABLED"          // 订阅系统启用开关
+	OptionKeySubscriptionGrayscaleThreshold = "SUBSCRIPTION_GRAYSCALE_THRESHOLD" // 灰度发布阈值（0-100）
+	OptionKeySubscriptionGrayscaleMode      = "SUBSCRIPTION_GRAYSCALE_MODE"      // 灰度模式：off/percentage/user_id
 )
 
 // 灰度模式常量
@@ -424,7 +428,7 @@ const (
 
 // 订阅优先级（数字越小优先级越高）
 const (
-	SubscriptionPriorityHighest = 1  // 最高优先级
+	SubscriptionPriorityHighest = 1 // 最高优先级
 	SubscriptionPriorityHigh    = 10
 	SubscriptionPriorityNormal  = 50
 	SubscriptionPriorityLow     = 90

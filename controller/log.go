@@ -99,6 +99,24 @@ func GetLogByKey(c *gin.Context) {
 	})
 }
 
+func GetTokenUsageOverview(c *gin.Context) {
+	pageInfo := common.GetPageQuery(c)
+	key := c.Query("key")
+	details, total, dailyStats, tokenName, err := model.GetTokenUsageOverview(key, pageInfo.GetStartIdx(), pageInfo.GetPageSize())
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	pageInfo.SetTotal(int(total))
+	pageInfo.SetItems(details)
+	common.ApiSuccess(c, gin.H{
+		"token_name":    tokenName,
+		"detail":        pageInfo,
+		"daily_stats":   dailyStats,
+		"queried_today": true,
+	})
+}
+
 func GetLogsStat(c *gin.Context) {
 	logType, _ := strconv.Atoi(c.Query("type"))
 	startTimestamp, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)

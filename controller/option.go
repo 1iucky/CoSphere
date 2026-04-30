@@ -200,6 +200,24 @@ func UpdateOption(c *gin.Context) {
 			})
 			return
 		}
+	case "TokenQueryRateLimitCount":
+		count, parseErr := strconv.Atoi(option.Value.(string))
+		if parseErr != nil || count < 1 {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "令牌查询限频次数必须大于等于 1",
+			})
+			return
+		}
+	case "TokenQueryRateLimitDurationSeconds":
+		duration, parseErr := strconv.Atoi(option.Value.(string))
+		if parseErr != nil || duration < 1 {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "令牌查询限频周期必须大于等于 1 秒",
+			})
+			return
+		}
 	case "ModelRequestConcurrencyLimitUserGroup":
 		err = setting.CheckModelRequestConcurrencyLimitUserGroup(option.Value.(string))
 		if err != nil {
