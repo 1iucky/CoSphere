@@ -12,6 +12,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
+	"github.com/QuantumNous/new-api/model"
 	"github.com/QuantumNous/new-api/setting"
 
 	"github.com/gin-gonic/gin"
@@ -205,6 +206,20 @@ func ModelRequestConcurrencyLimit() func(c *gin.Context) {
 		var userScope *concurrencyScope
 		var tokenScope *concurrencyScope
 
+		// 令牌级别并发限制（优先于系统分组配置）
+		tokenHasOwnConcurrencyLimit := false
+		if tokenId > 0 {
+			if tokenObj, exists := c.Get("token"); exists && tokenObj != nil {
+				if token, ok := tokenObj.(*model.Token); ok && token.ConcurrencyLimit > 0 {
+					tokenHasOwnConcurrencyLimit = true
+					tokenScope = &concurrencyScope{
+						key:   buildConcurrencyKey(modelRequestConcurrencyTokenKeyPrefix, strconv.Itoa(tokenId), group),
+						limit: token.ConcurrencyLimit,
+					}
+				}
+			}
+		}
+
 		if userId > 0 {
 			if limit, found := setting.GetUserGroupConcurrencyLimit(group); found && limit > 0 {
 				userScope = &concurrencyScope{
@@ -214,7 +229,7 @@ func ModelRequestConcurrencyLimit() func(c *gin.Context) {
 			}
 		}
 
-		if tokenId > 0 {
+		if !tokenHasOwnConcurrencyLimit && tokenId > 0 {
 			if limit, found := setting.GetTokenGroupConcurrencyLimit(group); found && limit > 0 {
 				tokenScope = &concurrencyScope{
 					key:   buildConcurrencyKey(modelRequestConcurrencyTokenKeyPrefix, strconv.Itoa(tokenId), group),

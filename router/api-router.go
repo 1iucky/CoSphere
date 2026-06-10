@@ -168,6 +168,7 @@ func SetApiRouter(router *gin.Engine) {
 			tokenRoute.PUT("/", controller.UpdateToken)
 			tokenRoute.DELETE("/:id", controller.DeleteToken)
 			tokenRoute.POST("/batch", controller.DeleteTokenBatch)
+			tokenRoute.POST("/:id/reset_rate_limit", controller.ResetTokenRateLimit)
 		}
 
 		usageRoute := apiRouter.Group("/usage")

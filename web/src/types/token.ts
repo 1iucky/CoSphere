@@ -69,6 +69,16 @@ export interface Token {
   auto_smart_group: boolean;
   /** 是否优先使用订阅扣费 */
   subscription_preferred: boolean;
+  /** 是否启用令牌级速率限制 */
+  rate_limit_enabled: boolean;
+  /** 每周期最大请求数（0=不限制） */
+  rate_limit_count: number;
+  /** 每周期最大成功请求数（0=不限制） */
+  rate_limit_success_count: number;
+  /** 速率限制周期（分钟） */
+  rate_limit_duration_minutes: number;
+  /** 令牌级并发限制（0=使用系统默认） */
+  concurrency_limit: number;
 }
 
 /**

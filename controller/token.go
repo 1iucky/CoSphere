@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -248,7 +249,12 @@ func AddToken(c *gin.Context) {
 		AllowIps:           tokenReq.AllowIps,
 		Group:              trimmedGroup,
 		AutoSmartGroup:     tokenReq.AutoSmartGroup,
-		SubscriptionPreferred:     tokenReq.SubscriptionPreferred,
+		SubscriptionPreferred:    tokenReq.SubscriptionPreferred,
+		RateLimitEnabled:         tokenReq.RateLimitEnabled,
+		RateLimitCount:           tokenReq.RateLimitCount,
+		RateLimitSuccessCount:    tokenReq.RateLimitSuccessCount,
+		RateLimitDurationMinutes: tokenReq.RateLimitDurationMinutes,
+		ConcurrencyLimit:         tokenReq.ConcurrencyLimit,
 	}
 
 	// 处理分组优先级
@@ -356,6 +362,11 @@ func UpdateToken(c *gin.Context) {
 		cleanToken.Group = strings.TrimSpace(tokenReq.Group)
 		cleanToken.AutoSmartGroup = tokenReq.AutoSmartGroup
 		cleanToken.SubscriptionPreferred = tokenReq.SubscriptionPreferred
+		cleanToken.RateLimitEnabled = tokenReq.RateLimitEnabled
+		cleanToken.RateLimitCount = tokenReq.RateLimitCount
+		cleanToken.RateLimitSuccessCount = tokenReq.RateLimitSuccessCount
+		cleanToken.RateLimitDurationMinutes = tokenReq.RateLimitDurationMinutes
+		cleanToken.ConcurrencyLimit = tokenReq.ConcurrencyLimit
 
 		// 处理分组优先级
 		if len(tokenReq.GroupPrioritiesArray) > 0 {
@@ -439,5 +450,29 @@ func DeleteTokenBatch(c *gin.Context) {
 		"success": true,
 		"message": "",
 		"data":    count,
+	})
+}
+
+func ResetTokenRateLimit(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	userId := c.GetInt("id")
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	_, err = model.GetTokenByIds(id, userId)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if common.RedisEnabled && common.RDB != nil {
+		ctx := context.Background()
+		tokenIdStr := strconv.Itoa(id)
+		common.RDB.Del(ctx, fmt.Sprintf("rateLimit:MRRLS:%s", tokenIdStr))
+		common.RDB.Del(ctx, fmt.Sprintf("rateLimit:%s", tokenIdStr))
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
 	})
 }

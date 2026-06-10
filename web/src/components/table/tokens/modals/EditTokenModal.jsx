@@ -47,6 +47,7 @@ import {
 	IconSave,
 	IconClose,
 	IconKey,
+	IconClock,
 } from '@douyinfe/semi-icons';
 import { useTranslation } from 'react-i18next';
 import { StatusContext } from '../../../../context/Status';
@@ -78,6 +79,11 @@ const EditTokenModal = (props) => {
     group_priorities_array: [],
     auto_smart_group: false,
     subscription_preferred: false,
+    rate_limit_enabled: false,
+    rate_limit_count: 0,
+    rate_limit_success_count: 0,
+    rate_limit_duration_minutes: 1,
+    concurrency_limit: 0,
     tokenCount: 1,
   });
 
@@ -632,6 +638,73 @@ const EditTokenModal = (props) => {
                       rows={1}
                       extraText={t('请勿过度信任此功能，IP可能被伪造')}
                       showClear
+                      style={{ width: '100%' }}
+                    />
+                  </Col>
+                </Row>
+              </Card>
+
+              {/* 速率限制 */}
+              <Card className='!rounded-2xl shadow-sm border-0'>
+                <div className='flex items-center mb-2'>
+                  <Avatar size='small' color='orange' className='mr-2 shadow-md'>
+                    <IconClock size={16} />
+                  </Avatar>
+                  <div>
+                    <Text className='text-lg font-medium'>{t('速率限制')}</Text>
+                    <div className='text-xs text-gray-600'>
+                      {t('设置令牌级别的速率和并发限制（覆盖系统设置）')}
+                    </div>
+                  </div>
+                </div>
+                <Row gutter={12}>
+                  <Col span={24}>
+                    <Form.Switch
+                      field='rate_limit_enabled'
+                      label={t('启用令牌级速率限制')}
+                      size='large'
+                      extraText={t('开启后使用下方配置覆盖系统级别的速率限制')}
+                    />
+                  </Col>
+                  {values.rate_limit_enabled && (
+                    <>
+                      <Col xs={24} sm={8}>
+                        <Form.InputNumber
+                          field='rate_limit_duration_minutes'
+                          label={t('限制周期')}
+                          min={1}
+                          suffix={t('分钟')}
+                          style={{ width: '100%' }}
+                        />
+                      </Col>
+                      <Col xs={24} sm={8}>
+                        <Form.InputNumber
+                          field='rate_limit_count'
+                          label={t('每周期最大请求数')}
+                          min={0}
+                          suffix={t('次')}
+                          extraText={t('0 表示不限制')}
+                          style={{ width: '100%' }}
+                        />
+                      </Col>
+                      <Col xs={24} sm={8}>
+                        <Form.InputNumber
+                          field='rate_limit_success_count'
+                          label={t('每周期最大成功请求数')}
+                          min={0}
+                          suffix={t('次')}
+                          extraText={t('0 表示不限制')}
+                          style={{ width: '100%' }}
+                        />
+                      </Col>
+                    </>
+                  )}
+                  <Col span={24}>
+                    <Form.InputNumber
+                      field='concurrency_limit'
+                      label={t('并发限制')}
+                      min={0}
+                      extraText={t('最大同时进行中的请求数，0 表示使用系统默认值')}
                       style={{ width: '100%' }}
                     />
                   </Col>

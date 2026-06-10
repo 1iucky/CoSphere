@@ -35,6 +35,11 @@ type Token struct {
 	GroupPriorities        string         `json:"group_priorities" gorm:"type:varchar(2048);default:''"` // 多分组优先级(JSON)
 	AutoSmartGroup         bool           `json:"auto_smart_group" gorm:"column:auto_smart_group;default:false"`             // 自动智能分组
 	SubscriptionPreferred  bool           `json:"subscription_preferred" gorm:"column:subscription_preferred;default:false"` // 是否优先使用订阅扣费
+	RateLimitEnabled       bool           `json:"rate_limit_enabled" gorm:"default:false"`
+	RateLimitCount         int            `json:"rate_limit_count" gorm:"default:0"`
+	RateLimitSuccessCount  int            `json:"rate_limit_success_count" gorm:"default:0"`
+	RateLimitDurationMinutes int          `json:"rate_limit_duration_minutes" gorm:"default:1"`
+	ConcurrencyLimit       int            `json:"concurrency_limit" gorm:"default:0"`
 	DeletedAt              gorm.DeletedAt `gorm:"index"`
 }
 
@@ -291,7 +296,9 @@ func (token *Token) Update() (err error) {
 	}()
 	err = DB.Model(token).Select("name", "status", "expired_time", "remain_quota", "unlimited_quota",
 		"model_limits_enabled", "model_limits", "allow_ips", "group", "group_priorities",
-		"auto_smart_group", "subscription_preferred").Updates(token).Error
+		"auto_smart_group", "subscription_preferred",
+		"rate_limit_enabled", "rate_limit_count", "rate_limit_success_count",
+		"rate_limit_duration_minutes", "concurrency_limit").Updates(token).Error
 	return err
 }
 

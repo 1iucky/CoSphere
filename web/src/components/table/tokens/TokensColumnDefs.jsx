@@ -39,6 +39,8 @@ import {
   renderQuota,
   getModelCategories,
   showError,
+  showSuccess,
+  API,
 } from '../../../helpers';
 import {
   IconTreeTriangleDown,
@@ -454,6 +456,25 @@ const renderOperations = (
         }}
       >
         {t('编辑')}
+      </Button>
+
+      <Button
+        type='tertiary'
+        size='small'
+        onClick={async () => {
+          try {
+            const res = await API.post(`/api/token/${record.id}/reset_rate_limit`);
+            if (res.data.success) {
+              showSuccess(t('速率限制已重置'));
+            } else {
+              showError(res.data.message);
+            }
+          } catch (e) {
+            showError(e.message);
+          }
+        }}
+      >
+        {t('重置限流')}
       </Button>
 
       <Button
